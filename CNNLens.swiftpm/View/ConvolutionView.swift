@@ -1,220 +1,296 @@
-//
-//  ConvolutionView.swift
-//  CNNLens
-//
-//  Created by Amnah Albrahim on 26/08/1447 AH.
-//
 import SwiftUI
-
-private enum Design {
-    enum Colors {
-        static let background = Color(red: 0.02, green: 0.05, blue: 0.12)
-        static let stroke = Color.blue.opacity(0.2)
-        static let title = Color.white
-        static let subtitle = Color.gray
-        static let barActive = Color(white: 0.2)
-        static let featureLabel = Color.blue
-        static let infoFill = Color.blue.opacity(0.1)
-        static let placeholder = Color.white.opacity(0.05)
-    }
-    enum Metrics {
-        static let vStackSpacing: CGFloat = 24
-        static let headerTopPadding: CGFloat = 20
-        static let hStackSpacing: CGFloat = 20
-        static let columnWidth: CGFloat = 280
-        static let featureSize: CGFloat = 320
-        static let kernelFieldWidth: CGFloat = 65
-        static let kernelCorner: CGFloat = 20
-        static let featureCorner: CGFloat = 24
-        static let infoCorner: CGFloat = 20
-        static let imageCorner: CGFloat = 15
-        static let toggleCorner: CGFloat = 10
-        static let navMinWidth: CGFloat = 88
-        static let navMinHeight: CGFloat = 44
-        static let backgroundOpacity: CGFloat = 0.2
-    }
-}
 
 struct ConvolutionView: View {
     @StateObject var viewModel: ConvolutionViewModel
+    @State private var isLearnMoreExpanded: Bool = false
     
+    // MARK: - Organized Design System Metrics
+    private let sideCardWidth: CGFloat = 340
+    private let centerCardWidth: CGFloat = 460
+    private let cardHeight: CGFloat = 650 // Locked height for perfect alignment
+    private let glassBackground = Color.white.opacity(0.06)
+    private let glassStroke = Color.white.opacity(0.12)
+
     var body: some View {
         ZStack {
-            // Brand background
-            Design.Colors.background.ignoresSafeArea()
-            BackgroundNetworkView().opacity(Design.Metrics.backgroundOpacity)
+            // Ambient Dashboard Background
+            Color(red: 0.02, green: 0.05, blue: 0.12).ignoresSafeArea()
+            BackgroundNetworkView().opacity(0.12)
             
-            VStack(spacing: Design.Metrics.vStackSpacing) {
-                StepProgressHeader(currentStep: "Convolution")
-                    .padding(.top, Design.Metrics.headerTopPadding)
-                
-                Text("Convolution Playground")
-                    .font(.title.bold())
-                    .foregroundColor(Design.Colors.title)
-                
-                HStack(alignment: .top, spacing: Design.Metrics.hStackSpacing) {
-                    kernelColumn
-                        .frame(width: Design.Metrics.columnWidth)
-                    
-                    featureMapColumn
-                    
-                    explanationColumn
-                        .frame(width: Design.Metrics.columnWidth)
+            VStack(spacing: 30) {
+                // MARK: - Header
+                VStack(spacing: 8) {
+                    StepProgressHeader(currentStep: "Convolution")
+                        .padding(.top, 10)
+                    Text("Convolution Playground")
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundColor(.white)
                 }
-                
-                Spacer()
-                
-                navigationBar
-            }
-            .padding(.horizontal)
-        }
-    }
-    
-    // MARK: - Sections (preserve exact visuals)
-    
-    private var kernelColumn: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("3×3 Kernel")
-                .font(.headline)
-                .foregroundColor(Design.Colors.title)
-            
-            HStack {
-                ForEach(["Edge", "Blur", "Sharpen", "Emboss"], id: \.self) { p in
-                    Button(p) {
-                        viewModel.selectedPreset = p
-                        viewModel.kernel = KernelPresets.all.first(where: { $0.name == p })?.matrix ?? viewModel.kernel
-                        viewModel.process()
+
+                // MARK: - 3-Column Dashboard Grid
+                HStack(alignment: .top, spacing: 24) {
+                    
+                    // LEFT: Kernel Controls
+                    dashboardCard(width: sideCardWidth) {
+                        VStack(alignment: .leading, spacing: 24) {
+                            CardHeader(title: "3x3 Kernel", icon: "square.grid.3x3")
+                            presetSelector
+                            kernelInputGrid // Numbers visible and bold
+                            
+                            Spacer()
+                            parameterSection // Fixed visible numbers
+                        }
                     }
-                    .buttonStyle(.bordered)
-                    .tint(viewModel.selectedPreset == p ? .blue : .gray)
-                    .accessibilityLabel("\(p) preset")
-                }
-            }
-            
-            VStack(spacing: 8) {
-                ForEach(0..<3, id: \.self) { r in
-                    HStack(spacing: 8) {
-                        ForEach(0..<3, id: \.self) { c in
-                            TextField("", value: $viewModel.kernel[r][c], format: .number)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: Design.Metrics.kernelFieldWidth)
-                                .multilineTextAlignment(.center)
-                                .onChange(of: viewModel.kernel[r][c]) { _ in viewModel.process() }
-                                .accessibilityLabel("Kernel value row \(r + 1), column \(c + 1)")
+
+                    // CENTER: Visual Feature Map Hero
+                    dashboardCard(width: centerCardWidth) {
+                        VStack(spacing: 24) {
+                            Text("FEATURE MAP")
+                                .font(.system(size: 20, weight: .black))
+                                .kerning(4)
+                                .foregroundColor(.blue)
+
+                            mainFeatureDisplay
+                            
+                            Text("Output size varies with stride & padding")
+                                .font(.footnote)
+                                .foregroundColor(.white.opacity(0.6))
+                            
+                            Spacer()
+                            activationToggleRow // Standard Toggle design
+                        }
+                    }
+
+                    // RIGHT: The Refined Analysis Card
+                    dashboardCard(width: sideCardWidth) {
+                        VStack(alignment: .leading, spacing: 20) {
+                            Text("What does this detect?")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.white)
+                            
+                            // High-Visibility Description
+                            Text(viewModel.currentDescription)
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.9))
+                                .lineSpacing(4)
+                            
+                            // Purple-Tinted AI Insight Box
+                            aiInsightBox
+                            
+                            // Learn More Disclosure
+                            learnMoreAccordion
+                            
+                            Spacer() // Alignment anchor
                         }
                     }
                 }
+                .padding(.horizontal)
+
+                Spacer()
+                navigationFooter
             }
+        }
+    }
+
+    // MARK: - UI Subcomponents
+
+    private var aiInsightBox: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "lightbulb.fill")
+                .foregroundColor(.yellow)
+                .font(.system(size: 14))
             
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Stride: \(viewModel.stride)").font(.caption).foregroundColor(.blue)
-                Slider(value: .constant(1), in: 1...2)
-                    .accessibilityLabel("Stride")
-                Text("Padding: \(viewModel.padding)").font(.caption).foregroundColor(.blue)
-                Slider(value: .constant(0), in: 0...1)
-                    .accessibilityLabel("Padding")
+            VStack(alignment: .leading, spacing: 4) {
+                (Text("In a real CNN, the network ") + Text("learns").bold() + Text(" these kernel values during training — hundreds of them — each specializing in different patterns."))
+                    .font(.system(size: 13))
+                    .foregroundColor(.white)
+                    .lineSpacing(3)
             }
         }
         .padding()
-        .background(.ultraThinMaterial)
-        .overlay(
-            RoundedRectangle(cornerRadius: Design.Metrics.kernelCorner, style: .continuous)
-                .stroke(Design.Colors.stroke, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Design.Metrics.kernelCorner, style: .continuous))
+        .background(Color.purple.opacity(0.15)) // Reverted to purple design
+        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.purple.opacity(0.2), lineWidth: 1))
+    }
+
+    private var learnMoreAccordion: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                withAnimation(.spring()) { isLearnMoreExpanded.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: isLearnMoreExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
+                    Text("Learn More")
+                        .font(.system(size: 14, weight: .bold))
+                }
+                .foregroundColor(.blue)
+            }
+            
+            if isLearnMoreExpanded {
+                Text("Convolution is the core operation of CNNs. The kernel slides across the input image. At each position, element-wise multiplication and summation produce a single output value. Stride controls kernel movement, while padding adds a border to preserve dimensions.")
+                    .font(.system(size: 13))
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineSpacing(5)
+                    .padding()
+                    .background(Color.black.opacity(0.3)) // Dark inset box
+                    .cornerRadius(12)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    private var kernelInputGrid: some View {
+        let cols = Array(repeating: GridItem(.fixed(85), spacing: 12), count: 3)
+        return LazyVGrid(columns: cols, spacing: 12) {
+            ForEach(0..<3) { r in
+                ForEach(0..<3) { c in
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.black.opacity(0.4))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(glassStroke))
+                        
+                        TextField("", value: $viewModel.kernel[r][c], format: .number)
+                            .multilineTextAlignment(.center)
+                            .font(.system(size: 22, weight: .bold, design: .monospaced)) // Visible numbers
+                            .foregroundColor(.white)
+                            .textFieldStyle(.plain)
+                    }
+                    .frame(height: 55)
+                }
+            }
+        }
     }
     
-    private var featureMapColumn: some View {
-        VStack(spacing: 12) {
-            Text("Feature Map")
-                .font(.caption.smallCaps())
-                .foregroundColor(Design.Colors.featureLabel)
+    // New: Preset selector to resolve the missing symbol error.
+    private var presetSelector: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Preset")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.7))
+            Picker("Preset", selection: $viewModel.selectedPreset) {
+                ForEach(KernelPresets.all.map { $0.name }, id: \.self) { name in
+                    Text(name).tag(name)
+                }
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: viewModel.selectedPreset) { newValue in
+                viewModel.applyPreset(newValue)
+            }
+        }
+    }
+
+    // MARK: - Parameters section (Stride & Padding with fixed visible numbers)
+    private var parameterSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Parameters")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white.opacity(0.9))
             
+            // Stride
+            HStack {
+                Text("Stride")
+                    .foregroundColor(.white.opacity(0.8))
+                Spacer()
+                Text("\(viewModel.stride)")
+                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white)
+                    .frame(minWidth: 32, alignment: .trailing)
+                Stepper("", value: $viewModel.stride, in: 1...8, step: 1, onEditingChanged: { _ in
+                    viewModel.process()
+                })
+                .labelsHidden()
+                .tint(.blue)
+            }
+            
+            // Padding
+            HStack {
+                Text("Padding")
+                    .foregroundColor(.white.opacity(0.8))
+                Spacer()
+                Text("\(viewModel.padding)")
+                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white)
+                    .frame(minWidth: 32, alignment: .trailing)
+                Stepper("", value: $viewModel.padding, in: 0...8, step: 1, onEditingChanged: { _ in
+                    viewModel.process()
+                })
+                .labelsHidden()
+                .tint(.blue)
+            }
+        }
+        .padding(14)
+        .background(Color.black.opacity(0.3))
+        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(glassStroke, lineWidth: 1))
+        .accessibilityElement(children: .contain)
+    }
+
+    // MARK: - Center: Feature map display
+    private var mainFeatureDisplay: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.black.opacity(0.35))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(glassStroke, lineWidth: 1))
             if let img = viewModel.featureMap {
                 Image(uiImage: img)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: Design.Metrics.featureSize, height: Design.Metrics.featureSize)
-                    .clipShape(RoundedRectangle(cornerRadius: Design.Metrics.imageCorner, style: .continuous))
-                    .accessibilityLabel("Feature map image")
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(8)
             } else {
-                RoundedRectangle(cornerRadius: Design.Metrics.imageCorner, style: .continuous)
-                    .fill(Design.Colors.placeholder)
-                    .frame(width: Design.Metrics.featureSize, height: Design.Metrics.featureSize)
-                    .overlay(Text("No output yet").foregroundColor(.gray))
-                    .accessibilityHidden(true)
+                VStack(spacing: 10) {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                    Text("Processing...")
+                        .foregroundColor(.white.opacity(0.7))
+                        .font(.footnote)
+                }
+                .padding()
             }
-            
-            HStack(spacing: 0) {
-                Button("None") { viewModel.isReLUActive = false; viewModel.process() }
-                    .frame(minHeight: 44)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(!viewModel.isReLUActive ? Design.Colors.barActive : Color.clear)
-                    .accessibilityLabel("No activation")
-                Button("ReLU") { viewModel.isReLUActive = true; viewModel.process() }
-                    .frame(minHeight: 44)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(viewModel.isReLUActive ? Design.Colors.barActive : Color.clear)
-                    .accessibilityLabel("ReLU activation")
-            }
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: Design.Metrics.toggleCorner, style: .continuous))
-            .foregroundColor(.white)
         }
-        .padding()
-        .background(.ultraThinMaterial)
-        .overlay(
-            RoundedRectangle(cornerRadius: Design.Metrics.featureCorner, style: .continuous)
-                .stroke(Design.Colors.stroke, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Design.Metrics.featureCorner, style: .continuous))
+        .frame(height: 360)
     }
-    
-    private var explanationColumn: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("What does this detect?")
-                .font(.headline)
-                .foregroundColor(Design.Colors.title)
-            Text(viewModel.currentDescription)
-                .font(.subheadline)
-                .foregroundColor(Design.Colors.subtitle)
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Label("AI Insight", systemImage: "lightbulb.fill")
-                    .font(.caption.bold())
-                    .foregroundColor(Design.Colors.title)
-                Text("In a real CNN, these kernel values are learned during training, not set by humans.")
-                    .font(.caption)
-                    .foregroundColor(Design.Colors.subtitle)
-            }
-            .padding()
-            .background(Design.Colors.infoFill)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+    // MARK: - Center: Activation toggle row
+    private var activationToggleRow: some View {
+        Toggle(isOn: $viewModel.isReLUActive) {
+            Text("Apply ReLU Activation")
+                .foregroundColor(.white)
+                .font(.system(size: 16, weight: .semibold))
         }
-        .padding()
-        .background(.ultraThinMaterial)
-        .overlay(
-            RoundedRectangle(cornerRadius: Design.Metrics.infoCorner, style: .continuous)
-                .stroke(Design.Colors.stroke, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Design.Metrics.infoCorner, style: .continuous))
+        .tint(.blue)
+        .onChange(of: viewModel.isReLUActive) { _ in
+            viewModel.process()
+        }
     }
-    
-    private var navigationBar: some View {
+
+    // MARK: - Footer
+    private var navigationFooter: some View {
         HStack {
-            Button("Back") {}
-                .buttonStyle(.bordered)
-                .tint(.gray)
-                .frame(minWidth: Design.Metrics.navMinWidth, minHeight: Design.Metrics.navMinHeight)
             Spacer()
-            Button("Next") {}
-                .buttonStyle(.borderedProminent)
-                .tint(.blue)
-                .frame(minWidth: Design.Metrics.navMinWidth, minHeight: Design.Metrics.navMinHeight)
+            Button {
+                // Re-run with current settings
+                viewModel.process()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Reprocess")
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.blue)
         }
         .padding(.horizontal)
-        .padding(.bottom, 20)
+        .padding(.bottom, 12)
+    }
+
+    private func dashboardCard<Content: View>(width: CGFloat, @ViewBuilder content: () -> Content) -> some View {
+        VStack { content() }
+            .padding(28)
+            .frame(width: width, height: cardHeight)
+            .background(glassBackground)
+            .cornerRadius(32)
+            .overlay(RoundedRectangle(cornerRadius: 32).stroke(glassStroke, lineWidth: 1.5))
     }
 }

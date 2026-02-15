@@ -31,6 +31,14 @@ class ConvolutionViewModel: ObservableObject {
         }
     }
     
+    // Added: allow the view to select a preset cleanly.
+    func applyPreset(_ name: String) {
+        guard let preset = KernelPresets.all.first(where: { $0.name == name }) else { return }
+        selectedPreset = preset.name
+        kernel = preset.matrix
+        process()
+    }
+    
     var currentDescription: String {
         KernelPresets.all.first(where: { $0.name == selectedPreset })?.description ?? ""
     }
