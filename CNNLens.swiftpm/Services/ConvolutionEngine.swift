@@ -5,98 +5,59 @@
 //  Created by Amnah Albrahim on 26/08/1447 AH.
 //
 import UIKit
-import Accelerate
+import CoreImage
 
-// --- Convolution Math ---
-struct ConvolutionEngine {
-    static func apply(image: UIImage, kernel: [[Double]]) -> UIImage? {
-        // Flatten and scale kernel to Int16 as required by vImage
-        let flatKernel = kernel.flatMap { $0 }.map { Float($0) }
-        guard
-            let cgImage = image.cgImage,
-            let kernelWidthInt = kernel.first?.count,
-            kernelWidthInt > 0
-        else {
-            return nil
+class ConvolutionEngine {
+    static func apply(image: UIImage, kernel: [[Double]], stride: Int, padding: Int = 0) -> UIImage? {
+        // MARK: - 1. Apply Zero-Padding
+        // We create a black canvas larger than the original to simulate zero-padding semantics
+        let workingImage: UIImage
+        if padding > 0 {
+            let pad = CGFloat(padding)
+            let newSize = CGSize(width: image.size.width + 2 * pad, height: image.size.height + 2 * pad)
+            UIGraphicsBeginImageContextWithOptions(newSize, true, image.scale)
+            
+            UIColor.black.setFill() // Zero-padding uses black (0) values
+            UIRectFill(CGRect(origin: .zero, size: newSize))
+            
+            image.draw(in: CGRect(x: pad, y: pad, width: image.size.width, height: image.size.height))
+            let paddedImage = UIGraphicsGetImageFromCurrentImageContext()
+            UIGraphicsEndImageContext()
+            workingImage = paddedImage ?? image
+        } else {
+            workingImage = image
         }
-
-        let kernelHeight: UInt32 = UInt32(kernel.count)
-        let kernelWidth: UInt32 = UInt32(kernelWidthInt)
-
-        // vImage expects Int16 kernel with a divisor
-        let matrix: [Int16] = flatKernel.map { Int16($0 * 100) }
-        let divisor: Int32 = (flatKernel.reduce(0, +) == 0) ? 1 : 100
-
-        // Use ARGB8888 format because we call vImageConvolve_ARGB8888
-        let argb8888Format = vImage_CGImageFormat(
-            bitsPerComponent: 8,
-            bitsPerPixel: 32,
-            colorSpace: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.first.rawValue), // ARGB
-            renderingIntent: .defaultIntent
-        )!
-
-        // Build source buffer as var so we can pass it inout
-        guard var sourceBuffer = try? vImage_Buffer(cgImage: cgImage, format: argb8888Format) else {
-            return nil
-        }
-
-        // Create destination buffer with same dimensions and bpp
-        var destBuffer = try! vImage_Buffer(
-            width: Int(sourceBuffer.width),
-            height: Int(sourceBuffer.height),
-            bitsPerPixel: argb8888Format.bitsPerPixel
-        )
-
-        // Perform convolution
-        let error: vImage_Error = matrix.withUnsafeBufferPointer { kernelPtr in
-            vImageConvolve_ARGB8888(
-                &sourceBuffer,
-                &destBuffer,
-                nil,                // tempBuffer
-                0,                  // srcOffsetToROI_X
-                0,                  // srcOffsetToROI_Y
-                kernelPtr.baseAddress,
-                kernelHeight,
-                kernelWidth,
-                divisor,
-                nil,                // backgroundColor (ignored with kvImageEdgeExtend)
-                vImage_Flags(kvImageEdgeExtend)
-            )
-        }
-
-        defer {
-            // Free buffers before exiting
-            sourceBuffer.free()
-            destBuffer.free()
-        }
-
-        // Build output image if successful
-        guard error == kvImageNoError,
-              let outCGImage = try? destBuffer.createCGImage(format: argb8888Format)
-        else {
-            return nil
-        }
-
-        return UIImage(cgImage: outCGImage)
-    }
-}
-
-// --- ReLU Activation Math ---
-struct ActivationService {
-    static func applyReLU(to image: UIImage) -> UIImage? {
-        guard let ciImage = CIImage(image: image) else { return nil }
-        // Simple ReLU filter: sets negative pixel values to 0
-        let filter = CIFilter(name: "CIColorMatrix")
+        
+        guard let ciImage = CIImage(image: workingImage) else { return image }
+        
+        // MARK: - 2. Configure Convolution Math
+        let weights = kernel.flatMap { $0 }.map { CGFloat($0) }
+        let filter = CIFilter(name: "CIConvolution3X3")
         filter?.setValue(ciImage, forKey: kCIInputImageKey)
-        filter?.setValue(CIVector(x: 1, y: 0, z: 0, w: 0), forKey: "inputRVector")
-        filter?.setValue(CIVector(x: 0, y: 1, z: 0, w: 0), forKey: "inputGVector")
-        filter?.setValue(CIVector(x: 0, y: 0, z: 1, w: 0), forKey: "inputBVector")
-
-        if let output = filter?.outputImage,
-           let cgImage = CIContext().createCGImage(output, from: output.extent) {
-            return UIImage(cgImage: cgImage)
+        filter?.setValue(CIVector(values: weights, count: 9), forKey: "inputWeights")
+        
+        // MARK: - 3. VISIBILITY FIX: Handle Zero-Sum Kernels (Edge Detection)
+        // Edge kernels sum to 0, which makes the output appear black.
+        // We add a bias of 0.5 to shift the results into visible gray tones.
+        let kernelSum = weights.reduce(0, +)
+        if abs(kernelSum) < 0.01 {
+            filter?.setValue(0.5, forKey: "inputBias")
         }
-        return nil
+        
+        guard var output = filter?.outputImage else { return image }
+        
+        // MARK: - 4. Apply Stride (Downsampling)
+        if stride > 1 {
+            let scale = 1.0 / CGFloat(stride)
+            output = output.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        }
+        
+        // MARK: - 5. Final Render
+        let context = CIContext()
+        if let cgImage = context.createCGImage(output, from: output.extent) {
+            return UIImage(cgImage: cgImage, scale: workingImage.scale, orientation: workingImage.imageOrientation)
+        }
+        
+        return image
     }
 }

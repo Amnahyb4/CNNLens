@@ -21,7 +21,7 @@ class PreprocessingViewModel: ObservableObject {
     
     func applyProcessing() {
         // Real-time processing of the image based on toggle states
-        self.processedImage = ImageProcessor.process(
+        self.processedImage = ImageProcessor.shared.process(
             imageName: originalImageName,
             state: state
         )

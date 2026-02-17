@@ -42,6 +42,11 @@ struct PreprocessingView: View {
     @Environment(\.dismiss) var dismiss
     @State private var goToConvolution = false
     
+    // REQUIREMENT: All toggles must be ON before proceeding
+    private var allPreprocessingTogglesOn: Bool {
+        viewModel.state.isResized && viewModel.state.isNormalized && viewModel.state.isGrayscale
+    }
+    
     init(imageName: String) {
         _viewModel = StateObject(wrappedValue: PreprocessingViewModel(selectedImageName: imageName))
     }
@@ -71,8 +76,9 @@ struct PreprocessingView: View {
                               image: UIImage(named: viewModel.originalImageName),
                               accent: .gray,
                               fill: Design.Colors.cardFill)
+                    
                     ImageCard(title: "Processed",
-                              image: viewModel.processedImage,
+                              image: viewModel.processedImage, // Visually shows real-time changes
                               accent: .blue,
                               fill: Design.Colors.cardFill)
                 }
@@ -92,11 +98,12 @@ struct PreprocessingView: View {
             .padding(.horizontal)
         }
         .navigationBarBackButtonHidden()
+        // DATA LINEAGE: Pass the processed result to the next stage
         .navigationDestination(isPresented: $goToConvolution) {
-            if let img = UIImage(named: viewModel.originalImageName) {
+            if let img = viewModel.processedImage {
                 ConvolutionView(viewModel: ConvolutionViewModel(image: img))
             } else {
-                Text("Unable to load image").foregroundColor(.red)
+                Text("Error processing image").foregroundColor(.red)
             }
         }
     }
@@ -130,6 +137,7 @@ struct PreprocessingView: View {
             
             Spacer()
             
+            // GATEWAY: Button only active when all steps are completed
             Button {
                 goToConvolution = true
             } label: {
@@ -138,12 +146,17 @@ struct PreprocessingView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(Design.Colors.navTint)
+            .disabled(!allPreprocessingTogglesOn) // Strictly enforced
+            .opacity(allPreprocessingTogglesOn ? 1.0 : 0.6)
+            .accessibilityHint(allPreprocessingTogglesOn ? "Proceeds to convolution." : "Enable all preprocessing steps to continue.")
         }
         .padding(.horizontal)
         .padding(.bottom, Design.Metrics.bottomPadding)
         .foregroundColor(.white)
     }
 }
+
+// MARK: - Helper Views
 
 private struct ImageCard: View {
     let title: String

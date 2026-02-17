@@ -152,9 +152,18 @@ struct ConvolutionView: View {
                         
                         TextField("", value: $viewModel.kernel[r][c], format: .number)
                             .multilineTextAlignment(.center)
-                            .font(.system(size: 22, weight: .bold, design: .monospaced)) // Visible numbers
+                            .font(.system(size: 22, weight: .bold, design: .monospaced))
                             .foregroundColor(.white)
                             .textFieldStyle(.plain)
+                            .keyboardType(.numbersAndPunctuation) // Optimization for iPad input
+                            
+                            // TRIGGERS: This makes the Feature Map change as you type
+                            .onChange(of: viewModel.kernel[r][c]) { _ in
+                                viewModel.process()
+                            }
+                            .onSubmit {
+                                viewModel.process()
+                            }
                     }
                     .frame(height: 55)
                 }
