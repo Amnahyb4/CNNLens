@@ -56,18 +56,14 @@ struct SampleSelectionView: View {
                 // 2x2 gallery grid
                 LazyVGrid(columns: columns, alignment: .center, spacing: Design.Metrics.gridSpacing) {
                     ForEach(viewModel.samples) { sample in
-                        NavigationLink {
-                            PreprocessingView(imageName: sample.imageName)
-                        } label: {
-                            SampleCard(sample: sample)
-                                .accessibilityElement(children: .combine)
-                                .accessibilityLabel("Sample: \(sample.name)")
-                                .accessibilityAddTraits(.isButton)
-                        }
-                        .buttonStyle(.plain)
-                        .simultaneousGesture(TapGesture().onEnded {
-                            viewModel.selectImage(sample)
-                        })
+                        // Tap to select and navigate
+                        SampleCard(sample: sample)
+                            .onTapGesture {
+                                viewModel.selectImage(sample)
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("Sample: \(sample.name)")
+                            .accessibilityAddTraits(.isButton)
                     }
                 }
                 .frame(maxWidth: Design.Metrics.gridMaxWidth)
@@ -75,6 +71,16 @@ struct SampleSelectionView: View {
                 
                 Spacer(minLength: 0)
             }
+
+            // Hidden NavigationLink that activates when a sample is selected
+            NavigationLink(
+                destination: ChallengeSelectionView(selectedSample: viewModel.selectedSample),
+                isActive: $viewModel.navigateToChallenges
+            ) {
+                EmptyView()
+            }
+            .hidden()
+
         }
         .navigationBarTitleDisplayMode(.inline)
     }

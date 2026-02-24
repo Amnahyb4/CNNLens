@@ -7,6 +7,7 @@ struct MyApp: App {
             NavigationStack {
                 LandingView()
             }
+            .preferredColorScheme(.dark)
         }
     }
 }

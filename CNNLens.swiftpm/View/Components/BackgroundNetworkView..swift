@@ -1,3 +1,9 @@
+//
+//  BackgroundNetworkView..swift
+//  CNNLens
+//
+//  Created by Amnah Albrahim on 02/09/1447 AH.
+//
 import SwiftUI
 
 struct Node: Identifiable {
@@ -7,6 +13,9 @@ struct Node: Identifiable {
 }
 
 struct BackgroundNetworkView: View {
+    // You can override this when embedding if needed
+    var backgroundColor: Color = Color(red: 0.02, green: 0.05, blue: 0.12) // dark blue
+
     @State private var nodes: [Node] = (0..<30).map { _ in
         Node(
             position: CGPoint(x: CGFloat.random(in: 0...1000), y: CGFloat.random(in: 0...1000)),
@@ -20,12 +29,16 @@ struct BackgroundNetworkView: View {
 
     var body: some View {
         Canvas { context, size in
-            // ✅ capture size (allowed)
+            // Fill dark blue background
+            let rectPath = Path(CGRect(origin: .zero, size: size))
+            context.fill(rectPath, with: .color(backgroundColor))
+
+            // capture size (allowed)
             if lastSize != size {
                 DispatchQueue.main.async { lastSize = size }
             }
 
-            // ✅ draw only
+            // draw network on top
             draw(context: &context)
         }
         .onReceive(timer) { _ in
@@ -69,4 +82,3 @@ struct BackgroundNetworkView: View {
         sqrt(pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2))
     }
 }
-

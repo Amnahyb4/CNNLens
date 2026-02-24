@@ -1,6 +1,5 @@
 //
 //  SampleSelectionViewModel.swift
-//  CNNLens
 //
 //  Created by Amnah Albrahim on 24/08/1447 AH.
 //
@@ -15,8 +14,14 @@ class SampleSelectionViewModel: ObservableObject {
         SampleImage(name: "Beverage", imageName: "drink")
     ]
     
+    // Track the selected sample and navigation state
+    @Published var selectedSample: SampleImage? = nil
+    @Published var navigateToChallenges: Bool = false
+    
     func selectImage(_ sample: SampleImage) {
+        selectedSample = sample
         print("Selected: \(sample.name)")
-        // Logic to move to the CNN analysis screen goes here
+        // Trigger navigation to ChallengeSelectionView
+        navigateToChallenges = true
     }
 }

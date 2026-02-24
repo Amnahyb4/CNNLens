@@ -14,7 +14,7 @@ private enum Design {
         static let ctaTint = Color.blue
     }
     enum Metrics {
-        static let titleSize: CGFloat = 44
+        static let titleSize: CGFloat = 69
         static let descriptionMaxWidth: CGFloat = 620
         static let buttonMaxWidth: CGFloat = 360
         static let buttonMinHeight: CGFloat = 44
