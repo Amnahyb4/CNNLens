@@ -167,8 +167,16 @@ struct ChallengeInfoCard: View {
         // Determine color based on status text
         let lower = text.lowercased()
         let isCompleted = lower.contains("completed")
-        let isNotCompleted = lower.contains("not complete")
-        let statusColor: Color = isCompleted ? .green : (isNotCompleted ? .red : Theme.secondary)
+        let isNotStarted = lower.contains("not started")
+        let isInProgress = lower.contains("in progress")
+
+        let statusColor: Color = {
+            if isCompleted { return .green }
+            if isInProgress { return .yellow }
+            if isNotStarted { return Theme.secondary }
+            // fallback for any other custom statuses
+            return Theme.secondary
+        }()
 
         return HStack(spacing: 8) {
             Circle()

@@ -1,101 +1,132 @@
-
 import SwiftUI
 import UIKit
+import Combine
 
 @MainActor
 final class PlaygroundViewModel: ObservableObject {
-
+    
     // MARK: - Inputs (from Challenge + Sample)
     let challenge: Challenge
     let originalAssetName: String
-
+    
     // MARK: - Gate / Preprocess
     @Published var showPreprocessGate: Bool = true
     @Published var preprocess = PreprocessOptions(resizeOn: true, normalizeOn: true, grayscaleOn: true)
-
+    
     // MARK: - Kernel / Metrics / Evaluation
     @Published var kernel: Kernel = .identity()
     @Published var metrics: KernelMetrics = KernelAnalysisService.analyze(.identity())
     @Published var evaluation: EvaluationResult = EvaluationResult()
-
+    
     // MARK: - Images for UI
     @Published var originalUIImage: UIImage? = nil
-    @Published var outputUIImage: UIImage? = nil // Option B: nil until first output is produced
-
+    @Published var outputUIImage: UIImage? = nil
+    
     // MARK: - Internal processed + target
     private var processed: PreprocessService.Result? = nil
     private var targetBuffer: [Float]? = nil
-
+    
     private var hasProducedOutput = false
     private var computeTask: Task<Void, Never>? = nil
-
+    
+    // MARK: - Haptics
+    private let haptics = UINotificationFeedbackGenerator()
+    private var hasCelebrated: Bool = false
+    
+    // MARK: - Combine
+    private let kernelChangeSubject = PassthroughSubject<Void, Never>()
+    private var cancellables = Set<AnyCancellable>()
+    
     // MARK: - Init
     init(challenge: Challenge, originalAssetName: String) {
         self.challenge = challenge
-        self.originalAssetName = originalAssetName
-
+               self.originalAssetName = originalAssetName
         self.originalUIImage = ImageLoader.loadUIImage(named: originalAssetName)
         self.evaluation.statusText = "Not Started"
+        
+        // Prepare haptics early to minimize latency
+        haptics.prepare()
+        
+        // Debounce kernel changes to avoid running convolution while the user is typing
+        kernelChangeSubject
+            .debounce(for: .milliseconds(200), scheduler: RunLoop.main)
+            .sink { [weak self] in
+                guard let self else { return }
+                // Cancel any in-flight compute task before starting a new one
+                self.computeTask?.cancel()
+                // Pre-warm haptics just before compute
+                self.haptics.prepare()
+                self.computeTask = Task { [weak self] in
+                    guard let self else { return }
+                    self.computeOutputAndEvaluate()
+                }
+            }
+            .store(in: &cancellables)
     }
-
+    
     // MARK: - Gate action
     func confirmPreprocessAndEnterLab() {
         guard let ui = originalUIImage else { return }
-
-        // Preprocess ON (Resize + Normalize + Grayscale) — using 512 for iPad quality
+        
         self.processed = PreprocessService.run(
             image: ui,
             targetSize: 512,
             options: preprocess
         )
-
-        // Show processed input in Original panel (consistent display)
+        
         if let p = processed {
             self.originalUIImage = p.displayInput
             computeTargetIfNeeded()
         }
-
+        
         showPreprocessGate = false
         evaluation.statusText = "Not Started"
+        
+        // Fresh session: allow a new celebration and pre-warm haptics
+        hasCelebrated = false
+        haptics.prepare()
     }
-
+    
     // MARK: - User interactions
     func updateKernel(row: Int, col: Int, value: Double) {
         kernel.set(row, col, value)
         metrics = KernelAnalysisService.analyze(kernel)
-
-        // Live compute (debounced so typing feels smooth)
-        computeTask?.cancel()
-        computeTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 90_000_000) // ~90ms
-            await self?.computeOutputAndEvaluate()
-        }
+        
+        // Pre-warm haptics while scheduling compute
+        haptics.prepare()
+        
+        // Push a change event; debounced sink will compute
+        kernelChangeSubject.send(())
     }
-
+    
     func resetKernel() {
         kernel = .identity()
         metrics = KernelAnalysisService.analyze(kernel)
         outputUIImage = nil
-        evaluation = EvaluationResult(similarityPercent: nil, statusText: "Not Started", isComplete: false)
+        evaluation = EvaluationResult(similarityPercent: 0, statusText: "Not Started", isComplete: false)
         hasProducedOutput = false
+        
+        // Allow future celebration and prepare haptics
+        hasCelebrated = false
+        haptics.prepare()
     }
-
-    // Manual trigger (for the “Apply Kernel” button)
+    
     func applyCurrentKernel() {
-        computeTask?.cancel()
-        computeOutputAndEvaluate()
+        // Route through the same debounced pipeline
+        haptics.prepare()
+        kernelChangeSubject.send(())
     }
-
+    
     // MARK: - Core pipeline
     private func computeTargetIfNeeded() {
         guard let p = processed else { return }
-
+        
         let cacheKey = "\(originalAssetName)|\(challenge.id.rawValue)|\(p.optionsKey)"
         if let cached = TargetCache.shared.get(cacheKey) {
             self.targetBuffer = cached.buffer
             return
         }
-
+        
         let target = ConvolutionService.convolve3x3(
             input: p.gray,
             width: p.width,
@@ -103,24 +134,20 @@ final class PlaygroundViewModel: ObservableObject {
             kernel: challenge.idealKernel,
             normalized01: preprocess.normalizeOn
         )
-
+        
         TargetCache.shared.set(cacheKey, entry: .init(
             buffer: target.buffer,
             image: target.image,
             width: p.width,
             height: p.height
         ))
-
+        
         self.targetBuffer = target.buffer
     }
-
+    
     private func computeOutputAndEvaluate() {
-        guard !showPreprocessGate else { return }
-        guard let p = processed else { return }
-
-        if targetBuffer == nil { computeTargetIfNeeded() }
-        guard let target = targetBuffer else { return }
-
+        guard !showPreprocessGate, let p = processed, let target = targetBuffer else { return }
+        
         let out = ConvolutionService.convolve3x3(
             input: p.gray,
             width: p.width,
@@ -128,55 +155,123 @@ final class PlaygroundViewModel: ObservableObject {
             kernel: kernel,
             normalized01: preprocess.normalizeOn
         )
-
-        // Option B: output appears only after first meaningful computation
+        
         if !hasProducedOutput { hasProducedOutput = true }
         outputUIImage = out.image
-
-        // Similarity vs target (MSE -> %)
-        let sim = SimilarityService.mseSimilarityPercent(a: out.buffer, b: target)
-
-        // Rule checks (non-cheaty)
+        
+        // 1) Similarity
+        let signedNCC = SimilarityService.nccSigned(a: out.buffer, b: target) // [-1, 1]
+        let progressiveSim = pow(max(0.0, signedNCC), 2.0) * 100.0           // gentler ramp
+        let progressiveMagnitude = pow(abs(signedNCC), 2.0) * 100.0           // gentler ramp for Sobel
+        
+        // 2) Rules
         let rulesOK = rulesPass(challenge: challenge, metrics: metrics)
-
-        let complete = (sim >= challenge.similarityThreshold) && rulesOK
-        evaluation.similarityPercent = sim
+        
+        // 3) UI progress
+        var displayedSimilarity: Double
+        let isIdentity = (metrics.positiveCount == 1 && abs(metrics.centerWeight - 1.0) < 0.01)
+        
+        if isIdentity {
+            displayedSimilarity = 5.0
+        } else if !rulesOK {
+            // Penalize if math rules are broken; cap at 50%
+            displayedSimilarity = min(
+                (challenge.id == .sobelX) ? progressiveMagnitude : progressiveSim,
+                50.0
+            )
+        } else {
+            // For Sobel X, show magnitude so opposite polarity still shows progress.
+            displayedSimilarity = (challenge.id == .sobelX) ? progressiveMagnitude : progressiveSim
+        }
+        
+        // 4) Completion (accuracy-first)
+        let rawPercentSigned = signedNCC * 100.0
+        let meetsThreshold: Bool = {
+            switch challenge.id {
+            case .sobelX:
+                return abs(rawPercentSigned) >= challenge.similarityThreshold
+            default:
+                return max(0.0, rawPercentSigned) >= challenge.similarityThreshold
+            }
+        }()
+        let complete = meetsThreshold && rulesOK
+        
+        // Haptics only when challenge is completed: trigger exactly on false -> true
+        let wasComplete = evaluation.isComplete
+        if !wasComplete && complete && !hasCelebrated {
+            hasCelebrated = true
+            haptics.notificationOccurred(.success)
+            haptics.prepare()
+        }
+        
+        evaluation.similarityPercent = displayedSimilarity
         evaluation.isComplete = complete
-        evaluation.statusText = complete ? "Completed" : "Not Complete"
+        
+        // Contextual Status Text
+        // Use the user-visible similarity for messaging so it won't trigger while capped at 50%.
+        if displayedSimilarity >= 90.0 && !rulesOK {
+            evaluation.statusText = "Image looks close! Check Kernel Rules."
+        } else {
+            evaluation.statusText = complete ? "Completed" : "In Progress"
+        }
     }
-
-    // MARK: - Rules (tightened + educational)
+    
+    // MARK: - Strict Mathematical Rules
     private func rulesPass(challenge: Challenge, metrics: KernelMetrics) -> Bool {
-        // Helpers
-        func approx(_ a: Double, _ b: Double, eps: Double) -> Bool { abs(a - b) <= eps }
-
+        func approx(_ a: Double, _ b: Double, eps: Double = 0.05) -> Bool {
+            abs(a - b) <= eps
+        }
+        
         switch challenge.id {
-
         case .smoothing:
-            // Positive weights only, sum ~ 1, symmetric kernel (isotropic blur)
-            return !metrics.hasNegative
-                && approx(metrics.sum, 1.0, eps: 0.06)
-                && metrics.symmetry
-
+            let isAveraging = metrics.positiveCount >= 5
+            return !metrics.hasNegative &&
+            approx(metrics.sum, 1.0, eps: 0.02) &&
+            metrics.symmetry &&
+            isAveraging
+            
         case .sobelX:
-            // Directional first-derivative: zero-sum, negatives present, not symmetric, noticeable directional bias
-            return approx(metrics.sum, 0.0, eps: 0.10)
-                && metrics.hasNegative
-                && !metrics.symmetry
-                && metrics.directionalBias >= 0.25
-
+            // Enforce canonical Sobel X structure:
+            // 1) Zero-sum
+            // 2) Negative weights present
+            // 3) Directional bias (horizontal) high
+            // 4) Middle column is (approximately) all zeros
+            // 5) Center is ~0
+            // 6) Horizontal anti-symmetry: left column == - right column, row-wise
+            let sumIsZero = approx(metrics.sum, 0.0, eps: 0.1)
+            let biasIsHigh = metrics.directionalBias >= 0.05
+            let centerZero = approx(metrics.centerWeight, 0.0, eps: 0.05)
+            let midColZero =
+                approx(kernel.get(0, 1), 0.0, eps: 0.05) &&
+                approx(kernel.get(1, 1), 0.0, eps: 0.05) &&
+                approx(kernel.get(2, 1), 0.0, eps: 0.05)
+            let antiSymmetric =
+                approx(kernel.get(0, 0), -kernel.get(0, 2), eps: 0.05) &&
+                approx(kernel.get(1, 0), -kernel.get(1, 2), eps: 0.05) &&
+                approx(kernel.get(2, 0), -kernel.get(2, 2), eps: 0.05)
+            
+            return sumIsZero &&
+                   metrics.hasNegative &&
+                   biasIsHigh &&
+                   centerZero &&
+                   midColZero &&
+                   antiSymmetric
+            
         case .laplacian:
-            // Second derivative, isotropic: zero-sum, positives and negatives present, symmetric, low directional bias
-            let hasPosAndNeg = (metrics.positiveCount > 0 && metrics.negativeCount > 0)
-            return approx(metrics.sum, 0.0, eps: 0.10)
-                && hasPosAndNeg
-                && metrics.symmetry
-                && metrics.directionalBias <= 0.10
-
+            let hasBothSigns = metrics.positiveCount > 0 && metrics.negativeCount > 0
+            let isZeroSum = approx(metrics.sum, 0.0, eps: 0.001) //
+            
+            let centerVal = kernel.get(1, 1)
+            let neighborsSum = metrics.sum - centerVal //
+            
+            // ENHANCED RULE: Center must balance neighbors AND be a significant peak
+            let patternOK = approx(centerVal, -neighborsSum, eps: 0.001) //
+            let centerIsPeak = abs(centerVal) >= abs(neighborsSum) //
+            
+            return isZeroSum && metrics.symmetry && hasBothSigns && patternOK && centerIsPeak && metrics.directionalBias < 0.01
+            
         case .sharpening:
-            // High-pass with strong center: negatives present around, center weight dominates neighbors
-            return metrics.hasNegative
-                && metrics.centerDominance
+            return metrics.hasNegative && metrics.centerDominance && approx(metrics.sum, 1.0, eps: 0.05)
         }
     }
 }

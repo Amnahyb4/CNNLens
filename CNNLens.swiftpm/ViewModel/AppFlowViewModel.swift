@@ -1,9 +1,4 @@
-//
-//  AppFlowViewModel.swift
-//  CNNLens
-//
-//  Created by Amnah Albrahim on 03/09/1447 AH.
-//
+
 import SwiftUI
 
 @MainActor
