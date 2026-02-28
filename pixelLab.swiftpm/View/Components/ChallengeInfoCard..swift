@@ -219,7 +219,6 @@ private struct InfoPopoverContent: View {
                 .lineSpacing(3)
         }
         .padding(20)
-        // No custom background/shape: use system popover chrome for HIG consistency.
-        // Dismiss by tapping outside the popover (standard behavior).
+       
     }
 }

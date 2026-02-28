@@ -27,10 +27,12 @@ struct PlaygroundView: View {
     var body: some View {
         ZStack {
             background
-                .accessibilityHidden(vm.showCompletionPrompt) // hide when modal is up
+                .accessibilityHidden(vm.showCompletionPrompt)
 
             GeometryReader { proxy in
                 let sideWidth = clampedSideWidth(for: proxy.size.width)
+                // Match right card height to center column (2 images + similarity + two spacings of 16)
+                let centerColumnHeight = PGLayout.imageCardHeight * 2 + PGLayout.progressHeight + 2 * 16.0
 
                 VStack(spacing: 16) {
 
@@ -100,16 +102,23 @@ struct PlaygroundView: View {
                         if PGLayout.showColumnDividers { columnDivider }
 
                         // RIGHT: Goal & Education
-                        ChallengeInfoCard(
-                            title: "Challenge Goal",
-                            conceptTitle: vm.challenge.title,
-                            goal: vm.challenge.goal,
-                            hints: vm.challenge.hints,
-                            criteria: vm.challenge.criteria,
-                            statusText: vm.evaluation.statusText,
-                            educationalText: vm.challenge.educationalText
-                        )
-                        .frame(width: sideWidth, alignment: .top)
+                        VStack { // Wrap in a VStack to use a Spacer
+                            ChallengeInfoCard(
+                                title: "Challenge Goal",
+                                conceptTitle: vm.challenge.title,
+                                goal: vm.challenge.goal,
+                                hints: vm.challenge.hints,
+                                criteria: vm.challenge.criteria,
+                                statusText: vm.evaluation.statusText,
+                                educationalText: vm.challenge.educationalText,
+                                minHeight: centerColumnHeight
+                            )
+                            .frame(width: sideWidth) // Let the card take its natural height up to centerColumnHeight
+                            .frame(height: centerColumnHeight, alignment: .top) // Force the container to match the center column exactly
+                            
+                            Spacer(minLength: 0) // Ensures that if the card is somehow smaller, it stays pinned to the top line
+                        }
+                        .frame(width: sideWidth, height: centerColumnHeight) // Final containment to match the center column's bottom edge
                         .accessibilityIdentifier("challengeInfoCard")
                         .accessibilityHidden(vm.showCompletionPrompt)
                     }
@@ -121,7 +130,7 @@ struct PlaygroundView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
             
-            // SUCCESS POPUP: Triggered upon 100% completion
+            // SUCCESS POPUP
             if vm.showCompletionPrompt {
                 successOverlay
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.95)))
@@ -141,7 +150,6 @@ struct PlaygroundView: View {
 
     private var successOverlay: some View {
         ZStack {
-            // Semi-transparent backdrop to focus attention
             Color.black.opacity(0.4)
                 .ignoresSafeArea()
                 .onTapGesture { vm.showCompletionPrompt = false }
@@ -149,7 +157,6 @@ struct PlaygroundView: View {
 
             VStack(spacing: 24) {
                 VStack(spacing: 8) {
-                    // Uses dynamic phrase from VM (e.g., "Outstanding" or "Excellent Thinker!!")
                     Text(vm.completionPhrase.isEmpty ? "Great Job!" : vm.completionPhrase)
                         .font(.title3.weight(.bold))
                         .foregroundStyle(.white)
@@ -162,21 +169,19 @@ struct PlaygroundView: View {
                 }
 
                 VStack(spacing: 12) {
-                    // Primary Navigation Button
                     Button {
                         vm.showCompletionPrompt = false
-                        dismiss() // Return to Challenge Selection
+                        dismiss()
                     } label: {
                         Text("Choose Another Challenge")
                             .font(.headline)
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(Theme.accent) // Uses your theme's primary color
+                            .background(Theme.accent)
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
 
-                    // Secondary Stay Button (HIG compliance)
                     Button {
                         vm.showCompletionPrompt = false
                     } label: {
@@ -189,7 +194,7 @@ struct PlaygroundView: View {
             }
             .padding(28)
             .frame(width: 360)
-            .background(.ultraThinMaterial) // Signature Apple glass effect
+            .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 28))
             .overlay(
                 RoundedRectangle(cornerRadius: 28)
@@ -206,7 +211,6 @@ struct PlaygroundView: View {
 
     private var headerBar: some View {
         VStack(alignment: .center, spacing: 10) {
-            // Dynamically show "- Challenge Name - Playground"
             Text("\(vm.challenge.title) Playground")
                 .font(.title2.weight(.bold))
                 .foregroundStyle(Theme.text)

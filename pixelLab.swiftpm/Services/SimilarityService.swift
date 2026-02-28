@@ -40,12 +40,41 @@ enum SimilarityService {
         ncc(a, b) ?? 0.0
     }
 
-    /// Progressive, UI-friendly similarity percent (0...100) using NCC^4.
-    /// Keeps the progress bar from jumping to high values too early.
-    static func nccSimilarityPercent(a: [Float], b: [Float]) -> Double {
+    /// Progressive, UI-friendly similarity percent (0...100).
+    /// Recalibrated for high-responsiveness and immediate user feedback.
+    static func nccSimilarityPercent(
+        a: [Float],
+        b: [Float],
+        userKernel: [Float],
+        targetKernel: [Float]
+    ) -> Double {
         let ncc = nccSigned(a: a, b: b)
         let correlation = max(0.0, ncc)
-        let progressiveScore = pow(correlation, 4.0)
-        return progressiveScore * 100.0
+        
+        // 1. Image-based progress (Linear Scaling)
+        // By removing the power (pow) entirely, we make the progress bar
+        // track the visual change much more aggressively.
+        let imageScore = correlation * 60.0
+        
+        // 2. Kernel-matching bonus (Increased Weight: 40%)
+        // This provides a massive boost for simply putting numbers in the right direction.
+        // It turns the grid into a rewarding interactive puzzle.
+        var matchPoints: Double = 0
+        for i in 0..<userKernel.count {
+            let u = userKernel[i]
+            let t = targetKernel[i]
+            
+            // Check if signs match or if both are zero
+            if (u > 0 && t > 0) || (u < 0 && t < 0) || (u == 0 && t == 0) {
+                matchPoints += 1
+            }
+        }
+        
+        let kernelBonus = (matchPoints / Double(userKernel.count)) * 40.0
+        
+        // Combine scores for a total that reaches 100% when both match.
+        // This hybrid approach ensures the user never feels "stuck".
+        let finalScore = imageScore + kernelBonus
+        return min(100.0, finalScore)
     }
 }

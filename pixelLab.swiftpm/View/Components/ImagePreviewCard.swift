@@ -40,6 +40,7 @@ struct ImagePreviewCard: View {
                         .accessibilityHidden(true)
 
                     if let uiImage = image {
+                        // Inner container that we clip as a whole, so the image fill stays centered
                         ZStack {
                             RoundedRectangle(cornerRadius: innerCorner, style: .continuous)
                                 .fill(Color.white.opacity(0.04))
@@ -49,63 +50,58 @@ struct ImagePreviewCard: View {
                                 )
                                 .accessibilityHidden(true)
 
+                            // Fill the available inner area and keep the crop centered
                             Image(uiImage: uiImage)
                                 .resizable()
                                 .scaledToFill()
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .clipped()
-                                .clipShape(RoundedRectangle(cornerRadius: imageCorner, style: .continuous))
-                                .overlay(
-                                    LinearGradient(
-                                        colors: [Color.black.opacity(0.0), Color.black.opacity(0.08)],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                    .clipShape(RoundedRectangle(cornerRadius: imageCorner, style: .continuous))
+                                .frame(
+                                    width: geo.size.width - (innerPadding * 2),
+                                    height: geo.size.height - (innerPadding * 2),
+                                    alignment: .center
                                 )
+                                .clipped()
                                 .accessibilityHidden(true) // decorative; parent provides label/value
                         }
                         .padding(innerPadding)
+                        .clipShape(RoundedRectangle(cornerRadius: imageCorner, style: .continuous))
+                        .overlay(
+                            LinearGradient(
+                                colors: [Color.black.opacity(0.0), Color.black.opacity(0.08)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: imageCorner, style: .continuous))
+                        )
                     } else {
                         VStack(spacing: 10) {
                             Image(systemName: "wand.and.stars")
                                 .font(.system(size: 26, weight: .semibold))
                                 .foregroundStyle(Theme.tertiary)
                                 .accessibilityHidden(true)
-
+                            
                             Text(emptyStateTitle)
                                 .font(.headline.weight(.semibold))
                                 .foregroundStyle(Theme.text)
-
+                            
                             Text(emptyStateSubtitle)
                                 .font(.subheadline)
                                 .foregroundStyle(Theme.secondary)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 18)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding(22)
+                        .frame(maxWidth: .infinity)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: outerCorner, style: .continuous))
             }
-            .frame(minHeight: 160)
         }
         .padding(18)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(Theme.bgTop.opacity(0.95))
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(Theme.surface)
-            }
-        )
+        .background(Theme.surface)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Theme.border, lineWidth: 1)
         )
-        .accessibilityElement(children: .combine)
-        // The parent (caller) should set .accessibilityLabel and .accessibilityValue for context.
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(title)
     }
 }
