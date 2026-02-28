@@ -52,8 +52,7 @@ struct ImagePreviewCard: View {
                             Image(uiImage: uiImage)
                                 .resizable()
                                 .scaledToFill()
-                                .frame(width: geo.size.width - innerPadding * 2,
-                                       height: geo.size.height - innerPadding * 2)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 .clipped()
                                 .clipShape(RoundedRectangle(cornerRadius: imageCorner, style: .continuous))
                                 .overlay(
