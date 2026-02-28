@@ -5,6 +5,8 @@ struct ProgressBarView: View {
     let percent: Double? // nil => show “—”
     var goalPercent: Double? = nil // optional goal marker (e.g., 90%)
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
 
@@ -58,7 +60,7 @@ struct ProgressBarView: View {
             .frame(height: 12)
         }
         .padding(18)
-        .background(Theme.surface) // Supports Reduce Transparency fallback
+        .background(reduceTransparency ? Theme.surfaceOpaque : Theme.surfaceTranslucent) // Reactive Reduce Transparency
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)

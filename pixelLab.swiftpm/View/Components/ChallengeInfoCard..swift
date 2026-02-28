@@ -12,6 +12,7 @@ struct ChallengeInfoCard: View {
 
     @State private var showInfo: Bool = false
     @Environment(\.horizontalSizeClass) private var hSize
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -61,7 +62,7 @@ struct ChallengeInfoCard: View {
         }
         .padding(18)
         .frame(minHeight: minHeight, alignment: .top)
-        .background(Theme.surface)
+        .background(reduceTransparency ? Theme.surfaceOpaque : Theme.surfaceTranslucent)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -174,7 +175,7 @@ struct ChallengeInfoCard: View {
         }
         .padding(.horizontal, 12)
         .frame(height: 40)
-        .background(Theme.surface2)
+        .background(reduceTransparency ? Theme.surface2Opaque : Theme.surface2Translucent)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)

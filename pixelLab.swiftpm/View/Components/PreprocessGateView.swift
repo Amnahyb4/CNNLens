@@ -6,6 +6,7 @@ struct PreprocessGateView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var hSize
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         NavigationStack {
@@ -61,7 +62,7 @@ struct PreprocessGateView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
                 .padding(.bottom, 12)
-                .background(.regularMaterial)
+                .background(reduceTransparency ? Theme.surfaceOpaque : Theme.surfaceTranslucent)
             }
         }
         .presentationDetents([.medium, .large])

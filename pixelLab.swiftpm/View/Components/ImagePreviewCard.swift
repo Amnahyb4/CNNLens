@@ -6,6 +6,8 @@ struct ImagePreviewCard: View {
     let emptyStateTitle: String
     let emptyStateSubtitle: String
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
 
@@ -32,7 +34,7 @@ struct ImagePreviewCard: View {
 
                 ZStack {
                     RoundedRectangle(cornerRadius: outerCorner, style: .continuous)
-                        .fill(Theme.surface2)
+                        .fill(reduceTransparency ? Theme.surface2Opaque : Theme.surface2Translucent)
                         .overlay(
                             RoundedRectangle(cornerRadius: outerCorner, style: .continuous)
                                 .stroke(Theme.border, lineWidth: 1)
@@ -85,7 +87,7 @@ struct ImagePreviewCard: View {
             }
         }
         .padding(18)
-        .background(Theme.surface)
+        .background(reduceTransparency ? Theme.surfaceOpaque : Theme.surfaceTranslucent)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)

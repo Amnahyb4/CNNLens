@@ -23,9 +23,10 @@ struct PlaygroundView: View {
     @Environment(\.horizontalSizeClass) private var hSize
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
-    // Unified font for all text in this view
-    private let baseFont: Font = .system(size: 17, weight: .regular, design: .default)
+    // Dynamic Type-friendly large title with @ScaledMetric
+    @ScaledMetric(relativeTo: .largeTitle) private var headerTitleSize: CGFloat = 24
 
     var body: some View {
         ZStack {
@@ -147,8 +148,6 @@ struct PlaygroundView: View {
                 vm.confirmPreprocessAndEnterLab()
             }
         }
-        // Apply a single font to all text in this view
-        .environment(\.font, baseFont)
     }
 
     // MARK: - Success Popup UI
@@ -163,9 +162,11 @@ struct PlaygroundView: View {
             VStack(spacing: 24) {
                 VStack(spacing: 8) {
                     Text(vm.completionPhrase.isEmpty ? "Great Job!" : vm.completionPhrase)
+                        .font(.title) // Dynamic Type-friendly
                         .foregroundStyle(.white)
                     
                     Text("You've mastered \(vm.challenge.title)! Ready to explore a different concept?")
+                        .font(.body)
                         .foregroundStyle(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 20)
@@ -195,7 +196,13 @@ struct PlaygroundView: View {
             }
             .padding(28)
             .frame(width: 360)
-            .background(.ultraThinMaterial)
+            .background {
+                if reduceTransparency {
+                    Theme.surfaceOpaque
+                } else {
+                    Rectangle().fill(.ultraThinMaterial)
+                }
+            }
             .clipShape(RoundedRectangle(cornerRadius: 28))
             .overlay(
                 RoundedRectangle(cornerRadius: 28)
@@ -213,7 +220,7 @@ struct PlaygroundView: View {
     private var headerBar: some View {
         VStack(alignment: .center, spacing: 10) {
             Text("\(vm.challenge.title) Playground")
-                .font(.system(size: 24, weight: .bold, design: .default)) // Larger title
+                .font(.system(size: headerTitleSize, weight: .bold, design: .default)) // Scales with Dynamic Type via @ScaledMetric
                 .foregroundStyle(Theme.text)
                 .frame(maxWidth: .infinity, alignment: .center)
 
@@ -266,6 +273,8 @@ private struct CardContainer<Content: View>: View {
     let contentAlignment: Alignment
     @ViewBuilder var content: Content
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
     init(title: String, contentAlignment: Alignment = .leading, @ViewBuilder content: () -> Content) {
         self.title = title
         self.contentAlignment = contentAlignment
@@ -280,7 +289,7 @@ private struct CardContainer<Content: View>: View {
                 .padding(.top, 2)
         }
         .padding(18)
-        .background(Theme.surface)
+        .background(reduceTransparency ? Theme.surfaceOpaque : Theme.surfaceTranslucent)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -296,6 +305,7 @@ private struct CardHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title.uppercased())
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.tertiary)
                 .tracking(0.7)
                 .accessibilityAddTraits(.isHeader)

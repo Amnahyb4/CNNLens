@@ -8,19 +8,22 @@ enum Theme {
     static let bgBottom = Color(red: 0.02, green: 0.03, blue: 0.07)
 
     // MARK: - Surfaces & Cards
-    // Smart surface logic: Provides an opaque fallback for 'Reduce Transparency' users
+    // Provide explicit opaque/translucent variants so views can react with Environment.
+    static let surfaceOpaque = Color(red: 0.08, green: 0.10, blue: 0.16)
+    static let surfaceTranslucent = Color.white.opacity(0.08)
+
+    static let surface2Opaque = Color(red: 0.06, green: 0.08, blue: 0.14)
+    static let surface2Translucent = Color.white.opacity(0.06)
+
+    // Backwards-compatible computed properties (non-reactive at runtime)
     @MainActor
     static var surface: Color {
-        UIAccessibility.isReduceTransparencyEnabled
-            ? Color(red: 0.08, green: 0.10, blue: 0.16)
-            : Color.white.opacity(0.08)
+        UIAccessibility.isReduceTransparencyEnabled ? surfaceOpaque : surfaceTranslucent
     }
     
     @MainActor
     static var surface2: Color {
-        UIAccessibility.isReduceTransparencyEnabled
-            ? Color(red: 0.06, green: 0.08, blue: 0.14)
-            : Color.white.opacity(0.06)
+        UIAccessibility.isReduceTransparencyEnabled ? surface2Opaque : surface2Translucent
     }
 
     // Card states (dark, slightly lifted for depth)

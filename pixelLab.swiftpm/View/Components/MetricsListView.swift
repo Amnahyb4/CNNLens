@@ -3,6 +3,8 @@ import SwiftUI
 struct MetricsListView: View {
     let metrics: KernelMetrics
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header: Marked as a header for rotor navigation
@@ -31,7 +33,7 @@ struct MetricsListView: View {
             }
         }
         .padding(18)
-        .background(Theme.surface) // Supports the Reduce Transparency fallback
+        .background(reduceTransparency ? Theme.surfaceOpaque : Theme.surfaceTranslucent) // Reactive Reduce Transparency
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)

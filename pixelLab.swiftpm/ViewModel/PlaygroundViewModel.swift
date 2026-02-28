@@ -200,12 +200,14 @@ final class PlaygroundViewModel: ObservableObject {
         }()
         let complete = meetsThreshold && rulesOK
         
+        // Capture previous completion state BEFORE updating
+        let wasComplete = evaluation.isComplete
+        
         // 4) Update UI state
         evaluation.similarityPercent = progressiveScore
         evaluation.isComplete = complete
         
-        // Trigger Success Celebration
-        let wasComplete = evaluation.isComplete
+        // Trigger Success Celebration on the first transition to complete
         if !wasComplete && complete && !hasCelebrated && !showCompletionPrompt {
             hasCelebrated = true
             haptics.notificationOccurred(.success)

@@ -16,6 +16,11 @@ struct KernelGridView: View {
         count: 3
     )
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    // Scale cell size and font with Dynamic Type for legibility
+    @ScaledMetric(relativeTo: .title3) private var cellSize: CGFloat = 72
+    @ScaledMetric(relativeTo: .title3) private var cornerRadius: CGFloat = 16
+
     var body: some View {
         VStack(spacing: 12) {
             ForEach(0..<3, id: \.self) { r in
@@ -33,7 +38,7 @@ struct KernelGridView: View {
         // Refinement: Marks this as a single logical area with instructions
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Kernel Matrix")
-        .accessibilityHint("A 3 by 3 grid of numbers that define the image filter.")
+        .accessibilityHint("A 3 by 3 grid of numbers that define the image filter. Swipe to move between cells.")
     }
 
     private func cell(row: Int, col: Int) -> some View {
@@ -58,13 +63,13 @@ struct KernelGridView: View {
         )
         .keyboardType(.numbersAndPunctuation)
         .multilineTextAlignment(.center)
-        .font(.title3.weight(.semibold).monospacedDigit()) // Refinement: monospaced prevents text 'jitter'
+        .font(.title3.weight(.semibold).monospacedDigit()) // Monospaced prevents jitter
         .foregroundStyle(Theme.text)
-        .frame(width: 72, height: 72)
-        .background(Theme.surface2)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .frame(width: cellSize, height: cellSize)
+        .background(reduceTransparency ? Theme.surface2Opaque : Theme.surface2Translucent)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .stroke(isFocused ? Theme.accent.opacity(0.9) : Color.white.opacity(0.08),
                         lineWidth: isFocused ? 2 : 1)
         )
@@ -73,10 +78,11 @@ struct KernelGridView: View {
         .onSubmit { commit(row: row, col: col) }
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled(true)
-        // Accessibility Refinement: Added a descriptive hint for editing
+        // Accessibility: make each cell self-describing with coordinates and current value
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Row \(row + 1), Column \(col + 1)")
-        .accessibilityValue(text[row][col].isEmpty ? "zero" : text[row][col])
-        .accessibilityHint("Double tap to enter a new value for this part of the filter.")
+        .accessibilityValue(accessibilityValueForCell(row: row, col: col))
+        .accessibilityHint("Double tap to edit.")
     }
 
     private func commit(row: Int, col: Int) {
@@ -103,8 +109,16 @@ struct KernelGridView: View {
     }
 
     private func format(_ v: Double) -> String {
-        // Simple precision check: $$|v_{rounded} - v| < \epsilon$$
         if abs(v.rounded() - v) < 0.0001 { return String(Int(v)) }
         return String(format: "%.2f", v)
+    }
+
+    private func accessibilityValueForCell(row: Int, col: Int) -> String {
+        let str = text[row][col].isEmpty ? "0" : text[row][col]
+        // Replace "-" and "." combinations for clearer TTS
+        let spoken = str
+            .replacingOccurrences(of: "-", with: "minus ")
+            .replacingOccurrences(of: ".", with: " point ")
+        return spoken
     }
 }
