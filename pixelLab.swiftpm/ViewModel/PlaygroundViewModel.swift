@@ -99,8 +99,6 @@ final class PlaygroundViewModel: ObservableObject {
             let rulesOK = rulesPass(challenge: challenge, metrics: metrics)
             
             // 2) Behavioral Completion Logic
-            // FIX: Instead of forcing a high pixel-match, we check if rules pass AND similarity is > 65%.
-            // This allows the high-intensity "9 center" sharpening kernel (78.4%) to pass successfully.
             let behavioralThreshold: Double = 65.0
             let complete = rulesOK && (progressiveScore >= behavioralThreshold)
             

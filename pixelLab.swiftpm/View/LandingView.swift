@@ -3,12 +3,26 @@ import SwiftUI
 struct LandingView: View {
     @StateObject private var viewModel = LandingViewModel()
     
-    // Use ScaledMetric so the 69pt title respects the user's text size settings
     @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 69
+    
+    private func responsiveHPadding(for width: CGFloat) -> CGFloat {
+        if width >= 1100 { return 24 }
+        if width >= 900  { return 20 }
+        return 16
+    }
+    
+    private func responsiveDescriptionWidth(for width: CGFloat) -> CGFloat {
+        if width >= 1100 { return 620 }
+        if width >= 900  { return 560 }
+        return min(520, width - 48)
+    }
+    
+    private func responsiveButtonWidth(for width: CGFloat) -> CGFloat {
+        return min(360, width - 48)
+    }
     
     var body: some View {
         ZStack {
-            // Use your consistent brand background
             LinearGradient(colors: [Theme.bgTop, Theme.bgBottom], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
             
@@ -17,16 +31,23 @@ struct LandingView: View {
                 .allowsHitTesting(false)
                 .accessibilityHidden(true) // Explicitly hide decorative background from VoiceOver
             
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                .padding(.horizontal, 24)
+            GeometryReader { proxy in
+                let w = proxy.size.width
+                let hPad = responsiveHPadding(for: w)
+                let descW = responsiveDescriptionWidth(for: w)
+                let btnW = responsiveButtonWidth(for: w)
+                
+                content(descMaxWidth: descW, buttonWidth: btnW)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .padding(.horizontal, hPad)
+            }
         }
         .navigationDestination(isPresented: $viewModel.navigateToSamples) {
             SampleSelectionView()
         }
     }
     
-    private var content: some View {
+    private func content(descMaxWidth: CGFloat, buttonWidth: CGFloat) -> some View {
         VStack(spacing: 28) {
             // Main Title
             Text(viewModel.config.title)
@@ -47,14 +68,14 @@ struct LandingView: View {
                 .font(.title3)
                 .foregroundColor(Theme.secondary) // Improved contrast vs Color.gray
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 620)
+                .frame(maxWidth: descMaxWidth)
                 .padding(.horizontal, 24)
             
             // Primary Action Button
             Button(action: viewModel.startExperience) {
                 Text(viewModel.config.buttonText)
                     .font(.headline)
-                    .frame(maxWidth: 360, minHeight: 50) // Increased to 50 for even better accessibility
+                    .frame(maxWidth: buttonWidth, minHeight: 50) // Increased to 50 for even better accessibility
             }
             .buttonStyle(.borderedProminent)
             .tint(Theme.accent)

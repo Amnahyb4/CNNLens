@@ -3,10 +3,26 @@ import SwiftUI
 struct SampleSelectionView: View {
     @StateObject private var viewModel = SampleSelectionViewModel()
     
-    // UI Fix: Use fixed columns to ensure it stays 2-across on iPad
-    private var columns: [GridItem] {
-        [GridItem(.flexible(), spacing: 20),
-         GridItem(.flexible(), spacing: 20)]
+    private func adaptiveColumns(for width: CGFloat) -> [GridItem] {
+        if width >= 700 {
+            return [GridItem(.flexible(), spacing: 20),
+                    GridItem(.flexible(), spacing: 20)]
+        } else {
+            // Narrow / split view: 1 column so cards don't get squished
+            return [GridItem(.flexible(), spacing: 20)]
+        }
+    }
+    
+    private func responsiveHPadding(for width: CGFloat) -> CGFloat {
+        if width >= 900 { return 40 }
+        if width >= 700 { return 28 }
+        return 16
+    }
+    
+    private func responsiveMaxGridWidth(for width: CGFloat) -> CGFloat {
+        if width >= 900 { return 840 }
+        if width >= 700 { return min(760, width - 56) } // slightly smaller
+        return width - 32                               // narrow
     }
     
     var body: some View {
@@ -17,29 +33,39 @@ struct SampleSelectionView: View {
                 .opacity(0.15)
                 .accessibilityHidden(true)
             
-            VStack(spacing: 0) {
-                header
-                    .padding(.top, 30)
-                    .padding(.bottom, 24)
+            GeometryReader { proxy in
+                let w = proxy.size.width
+                let cols = adaptiveColumns(for: w)
+                let hPad = responsiveHPadding(for: w)
+                let maxW = responsiveMaxGridWidth(for: w)
+                
+                VStack(spacing: 0) {
+                    header
+                        .padding(.top, 30)
+                        .padding(.bottom, 24)
 
-                ScrollView {
-                    // Grid constrained to 840 max width for better 2x2 spacing
-                    LazyVGrid(columns: columns, spacing: 20) {
-                        ForEach(viewModel.samples) { sample in
-                            Button {
-                                viewModel.selectImage(sample)
-                            } label: {
-                                SampleCard(sample: sample)
+                    ScrollView {
+                        LazyVGrid(columns: cols, spacing: 20) {
+                            ForEach(viewModel.samples) { sample in
+                                Button {
+                                    viewModel.selectImage(sample)
+                                } label: {
+                                    SampleCard(sample: sample)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Sample: \(sample.name)")
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Sample: \(sample.name)")
                         }
+                        // ✅ UPDATED (ADD): padding now responsive
+                        .padding(.horizontal, hPad)
+                        .padding(.bottom, 40)
+                        // ✅ UPDATED (ADD): max width responsive (keeps your 840 when possible)
+                        .frame(maxWidth: maxW)
+                        .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    .padding(.horizontal, 40)
-                    .padding(.bottom, 40)
-                    .frame(maxWidth: 840)
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
         // Maintains your premium immersive navigation

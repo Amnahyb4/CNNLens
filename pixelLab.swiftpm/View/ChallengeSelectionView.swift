@@ -10,25 +10,43 @@ struct ChallengeSelectionView: View {
 
     var onContinue: ((Challenge) -> Void)? = nil
 
+    private func responsiveHPadding(for width: CGFloat) -> CGFloat {
+        // Wide iPads keep your current 48, smaller widths reduce to avoid squish
+        if width >= 1100 { return 48 }
+        if width >= 900  { return 32 }
+        return 16
+    }
+
+    private func responsiveCTAPadding(for width: CGFloat) -> CGFloat {
+        if width >= 1100 { return 48 }
+        if width >= 900  { return 32 }
+        return 16
+    }
+
     var body: some View {
         ZStack {
             background
 
-            VStack(spacing: 0) {
-                ScrollView {
-                    content
-                        .padding(.horizontal, 48)
-                        .padding(.top, 24)
-                        .padding(.bottom, 120)
-                }
+            GeometryReader { proxy in
+                let w = proxy.size.width
+                let hPad = responsiveHPadding(for: w)
+                let ctaPad = responsiveCTAPadding(for: w)
 
-                bottomCTA
+                VStack(spacing: 0) {
+                    ScrollView {
+                        content
+                            .padding(.horizontal, hPad)
+                            .padding(.top, 24)
+                            .padding(.bottom, 120)
+                    }
+
+                    bottomCTA(ctaHPadding: ctaPad)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        // UI Fix: We set this to empty to remove the redundant top title
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        // UI Fix: These modifiers make the nav bar transparent so the gradient is full-screen
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationDestination(isPresented: $navigateToPlayground) {
@@ -94,7 +112,7 @@ struct ChallengeSelectionView: View {
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
-    private var bottomCTA: some View {
+    private func bottomCTA(ctaHPadding: CGFloat) -> some View {
         VStack(spacing: 0) {
             Rectangle()
                 .fill(Color.white.opacity(0.06))
@@ -117,7 +135,8 @@ struct ChallengeSelectionView: View {
             .tint(Theme.accent)
             .disabled(!vm.canContinue)
             .opacity(vm.canContinue ? 1 : 0.6)
-            .padding(EdgeInsets(top: 12, leading: 48, bottom: 16, trailing: 48))
+            // ✅ UPDATED (ADD): was fixed 48; now responsive
+            .padding(EdgeInsets(top: 12, leading: ctaHPadding, bottom: 16, trailing: ctaHPadding))
             .accessibilityHint(vm.canContinue ? "Opens the lab for the selected challenge." : "Select a challenge above to enable this button.")
             .keyboardShortcut(.defaultAction)
         }

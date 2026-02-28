@@ -18,6 +18,12 @@ private enum PGLayout {
     static let showColumnDividers: Bool = true
 }
 
+// ✅ ADD: responsive breakpoints
+private enum PGResponsive {
+    static let threeColumnsMinWidth: CGFloat = 1180 // wide iPads
+    static let twoColumnsMinWidth: CGFloat = 900    // portrait / smaller
+}
+
 struct PlaygroundView: View {
     @StateObject var vm: PlaygroundViewModel
     @Environment(\.horizontalSizeClass) private var hSize
@@ -38,6 +44,9 @@ struct PlaygroundView: View {
                 // Match right card height to center column (2 images + similarity + two spacings of 16)
                 let centerColumnHeight = PGLayout.imageCardHeight * 2 + PGLayout.progressHeight + 2 * 16.0
 
+                // ✅ ADD: choose layout mode by available width
+                let mode = layoutMode(for: proxy.size.width)
+
                 VStack(spacing: 16) {
 
                     // Top Header (Dynamic Challenge Name)
@@ -48,83 +57,61 @@ struct PlaygroundView: View {
                         .padding(.top, PGLayout.outerVPadding - 4)
                         .accessibilityHidden(vm.showCompletionPrompt)
 
-                    // Main content columns
-                    HStack(alignment: .top, spacing: PGLayout.gap) {
+                    // ✅ UPDATED: responsive columns (3 / 2 / 1)
+                    Group {
+                        if mode == 3 {
 
-                        // LEFT: Controls & Metrics
-                        VStack(spacing: 16) {
-                            CardContainer(title: "Kernel (3x3)", contentAlignment: .center) {
-                                VStack(spacing: 14) {
-                                    KernelGridView(kernel: $vm.kernel) { r, c, v in
-                                        vm.updateKernel(row: r, col: c, value: v)
-                                    }
-                                }
+                            // ===== 3 COLUMN (your original layout) =====
+                            HStack(alignment: .top, spacing: PGLayout.gap) {
+                                leftColumn(sideWidth: sideWidth)
+
+                                if PGLayout.showColumnDividers { columnDivider }
+
+                                centerColumn()
+
+                                if PGLayout.showColumnDividers { columnDivider }
+
+                                rightColumn(sideWidth: sideWidth, centerColumnHeight: centerColumnHeight)
                             }
-                            .accessibilityLabel("Kernel editor, 3 by 3 grid")
 
-                            MetricsListView(metrics: vm.metrics)
-                                .accessibilityLabel("Live metrics")
+                        } else if mode == 2 {
+
+                            // ===== 2 COLUMN (left + center/right stacked) =====
+                            HStack(alignment: .top, spacing: 18) {
+                                // slightly slimmer side in medium width
+                                leftColumn(sideWidth: max(300, sideWidth - 40))
+
+                                if PGLayout.showColumnDividers { columnDivider }
+
+                                VStack(spacing: 16) {
+                                    centerColumn()
+
+                                    // let right card expand (no fixed width)
+                                    rightColumn(sideWidth: min(sideWidth, 360), centerColumnHeight: centerColumnHeight)
+                                        .frame(maxWidth: .infinity, alignment: .top)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .top)
+                            }
+
+                        } else {
+
+                            // ===== 1 COLUMN (narrow / split view) =====
+                            ScrollView {
+                                VStack(spacing: 16) {
+                                    centerColumn()
+
+                                    leftColumn(sideWidth: min(sideWidth, proxy.size.width - 32))
+                                        .frame(maxWidth: .infinity, alignment: .top)
+
+                                    rightColumn(
+                                        sideWidth: min(sideWidth, proxy.size.width - 32),
+                                        centerColumnHeight: centerColumnHeight
+                                    )
+                                    .frame(maxWidth: .infinity, alignment: .top)
+                                }
+                                .padding(.top, 4)
+                            }
                         }
-                        .frame(width: sideWidth, alignment: .top)
-                        .accessibilityHidden(vm.showCompletionPrompt)
-
-                        if PGLayout.showColumnDividers { columnDivider }
-
-                        // CENTER: Image Previews
-                        VStack(spacing: 16) {
-                            ImagePreviewCard(
-                                title: "ORIGINAL IMAGE",
-                                image: vm.originalUIImage,
-                                emptyStateTitle: "No image",
-                                emptyStateSubtitle: "Select a sample image to continue."
-                            )
-                            .frame(height: PGLayout.imageCardHeight)
-                            .accessibilityIdentifier("originalImageCard")
-                            .accessibilityLabel("Original image")
-                            .accessibilityValue(vm.originalUIImage == nil ? "No image selected" : "Image loaded")
-
-                            ImagePreviewCard(
-                                title: "YOUR OUTPUT",
-                                image: vm.outputUIImage,
-                                emptyStateTitle: "No output yet",
-                                emptyStateSubtitle: "Edit the kernel to generate output."
-                            )
-                            .frame(height: PGLayout.imageCardHeight)
-                            .accessibilityIdentifier("outputImageCard")
-                            .accessibilityLabel("Your output image")
-                            .accessibilityValue(vm.outputUIImage == nil ? "No output yet" : "Output generated")
-
-                            ProgressBarView(label: "SIMILARITY", percent: vm.evaluation.similarityPercent)
-                                .frame(height: PGLayout.progressHeight)
-                                .accessibilityIdentifier("similarityCard")
-                                .accessibilityLabel("Similarity")
-                                .accessibilityValue(vm.evaluation.similarityPercent == nil ? "No value" : String(format: "%.1f percent", vm.evaluation.similarityPercent!))
-                        }
-                        .frame(maxWidth: .infinity, alignment: .top)
-                        .accessibilityHidden(vm.showCompletionPrompt)
-
-                        if PGLayout.showColumnDividers { columnDivider }
-
-                        // RIGHT: Goal & Education
-                        VStack { // Wrap in a VStack to use a Spacer
-                            ChallengeInfoCard(
-                                title: "Challenge Goal",
-                                conceptTitle: vm.challenge.title,
-                                goal: vm.challenge.goal,
-                                hints: vm.challenge.hints,
-                                criteria: vm.challenge.criteria,
-                                statusText: vm.evaluation.statusText,
-                                educationalText: vm.challenge.educationalText,
-                                minHeight: centerColumnHeight
-                            )
-                            .frame(width: sideWidth) // Let the card take its natural height up to centerColumnHeight
-                            .frame(height: centerColumnHeight, alignment: .top) // Force the container to match the center column exactly
-                            
-                            Spacer(minLength: 0) // Ensures that if the card is somehow smaller, it stays pinned to the top line
-                        }
-                        .frame(width: sideWidth, height: centerColumnHeight) // Final containment to match the center column's bottom edge
-                        .accessibilityIdentifier("challengeInfoCard")
-                        .accessibilityHidden(vm.showCompletionPrompt)
                     }
                     .frame(maxWidth: PGLayout.maxContentWidth, alignment: .top)
                     .frame(maxWidth: .infinity, alignment: .top)
@@ -133,7 +120,7 @@ struct PlaygroundView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
-            
+
             // SUCCESS POPUP
             if vm.showCompletionPrompt {
                 successOverlay
@@ -150,6 +137,86 @@ struct PlaygroundView: View {
         }
     }
 
+    // MARK: - Column Blocks (ADDED)
+
+    private func leftColumn(sideWidth: CGFloat) -> some View {
+        VStack(spacing: 16) {
+            CardContainer(title: "Kernel (3x3)", contentAlignment: .center) {
+                VStack(spacing: 14) {
+                    KernelGridView(kernel: $vm.kernel) { r, c, v in
+                        vm.updateKernel(row: r, col: c, value: v)
+                    }
+                }
+            }
+            .accessibilityLabel("Kernel editor, 3 by 3 grid")
+
+            MetricsListView(metrics: vm.metrics)
+                .accessibilityLabel("Live metrics")
+        }
+        .frame(width: sideWidth, alignment: .top)
+        .accessibilityHidden(vm.showCompletionPrompt)
+    }
+
+    private func centerColumn() -> some View {
+        VStack(spacing: 16) {
+            ImagePreviewCard(
+                title: "ORIGINAL IMAGE",
+                image: vm.originalUIImage,
+                emptyStateTitle: "No image",
+                emptyStateSubtitle: "Select a sample image to continue."
+            )
+            .frame(height: PGLayout.imageCardHeight)
+            .accessibilityIdentifier("originalImageCard")
+            .accessibilityLabel("Original image")
+            .accessibilityValue(vm.originalUIImage == nil ? "No image selected" : "Image loaded")
+
+            ImagePreviewCard(
+                title: "YOUR OUTPUT",
+                image: vm.outputUIImage,
+                emptyStateTitle: "No output yet",
+                emptyStateSubtitle: "Edit the kernel to generate output."
+            )
+            .frame(height: PGLayout.imageCardHeight)
+            .accessibilityIdentifier("outputImageCard")
+            .accessibilityLabel("Your output image")
+            .accessibilityValue(vm.outputUIImage == nil ? "No output yet" : "Output generated")
+
+            ProgressBarView(label: "SIMILARITY", percent: vm.evaluation.similarityPercent)
+                .frame(height: PGLayout.progressHeight)
+                .accessibilityIdentifier("similarityCard")
+                .accessibilityLabel("Similarity")
+                .accessibilityValue(
+                    vm.evaluation.similarityPercent == nil
+                    ? "No value"
+                    : String(format: "%.1f percent", vm.evaluation.similarityPercent!)
+                )
+        }
+        .frame(maxWidth: .infinity, alignment: .top)
+        .accessibilityHidden(vm.showCompletionPrompt)
+    }
+
+    private func rightColumn(sideWidth: CGFloat, centerColumnHeight: CGFloat) -> some View {
+        VStack { // Wrap in a VStack to use a Spacer
+            ChallengeInfoCard(
+                title: "Challenge Goal",
+                conceptTitle: vm.challenge.title,
+                goal: vm.challenge.goal,
+                hints: vm.challenge.hints,
+                criteria: vm.challenge.criteria,
+                statusText: vm.evaluation.statusText,
+                educationalText: vm.challenge.educationalText,
+                minHeight: centerColumnHeight
+            )
+            .frame(width: sideWidth) // Let the card take its natural height up to centerColumnHeight
+            .frame(height: centerColumnHeight, alignment: .top) // Force the container to match the center column exactly
+
+            Spacer(minLength: 0) // Ensures that if the card is somehow smaller, it stays pinned to the top line
+        }
+        .frame(width: sideWidth, height: centerColumnHeight) // Final containment to match the center column's bottom edge
+        .accessibilityIdentifier("challengeInfoCard")
+        .accessibilityHidden(vm.showCompletionPrompt)
+    }
+
     // MARK: - Success Popup UI
 
     private var successOverlay: some View {
@@ -164,7 +231,7 @@ struct PlaygroundView: View {
                     Text(vm.completionPhrase.isEmpty ? "Great Job!" : vm.completionPhrase)
                         .font(.title) // Dynamic Type-friendly
                         .foregroundStyle(.white)
-                    
+
                     Text("You've mastered \(vm.challenge.title)! Ready to explore a different concept?")
                         .font(.body)
                         .foregroundStyle(.white.opacity(0.8))
@@ -234,6 +301,13 @@ struct PlaygroundView: View {
     }
 
     // MARK: - Layout Helpers
+
+    // ✅ ADD: mode selector
+    private func layoutMode(for width: CGFloat) -> Int {
+        if width >= PGResponsive.threeColumnsMinWidth { return 3 }
+        if width >= PGResponsive.twoColumnsMinWidth { return 2 }
+        return 1
+    }
 
     private func clampedSideWidth(for totalWidth: CGFloat) -> CGFloat {
         let proposed = PGLayout.baseSideWidth
