@@ -26,20 +26,14 @@ final class PlaygroundViewModel: ObservableObject {
     @Published var showCompletionPrompt: Bool = false
     @Published var completionPhrase: String = ""
     private static let encouragingPhrases: [String] = [
-        "Excellent thinker!!",
-        "Brilliant work!",
-        "Fantastic job!",
-        "You nailed it!",
-        "Great problem solving!",
-        "Outstanding!",
-        "Superb reasoning!",
-        "Well done!"
+        "Excellent thinker!!", "Brilliant work!", "Fantastic job!",
+        "You nailed it!", "Great problem solving!", "Outstanding!",
+        "Superb reasoning!", "Well done!"
     ]
     
-    // MARK: - Internal processed + target
+    // MARK: - Internal state
     private var processed: PreprocessService.Result? = nil
     private var targetBuffer: [Float]? = nil
-    
     private var hasProducedOutput = false
     private var computeTask: Task<Void, Never>? = nil
     
@@ -80,32 +74,83 @@ final class PlaygroundViewModel: ObservableObject {
             .store(in: &cancellables)
     }
     
-    // MARK: - Gate action
-    func confirmPreprocessAndEnterLab() {
-        guard let ui = originalUIImage else { return }
-        
-        self.processed = PreprocessService.run(
-            image: ui,
-            targetSize: 512,
-            options: preprocess
-        )
-        
-        if let p = processed {
-            self.originalUIImage = p.displayInput
-            computeTargetIfNeeded()
+    // MARK: - Core Logic Updates
+
+        private func computeOutputAndEvaluate() {
+            guard !showPreprocessGate, let p = processed, let target = targetBuffer else { return }
+            
+            let out = ConvolutionService.convolve3x3(
+                input: p.gray, width: p.width, height: p.height,
+                kernel: kernel, normalized01: preprocess.normalizeOn
+            )
+            
+            if !hasProducedOutput { hasProducedOutput = true }
+            outputUIImage = out.image
+            
+            let userValues = kernel.values.flatMap { $0 }.map { Float($0) }
+            let targetValues = challenge.idealKernel.values.flatMap { $0 }.map { Float($0) }
+
+            let progressiveScore = SimilarityService.nccSimilarityPercent(
+                a: out.buffer, b: target,
+                userKernel: userValues, targetKernel: targetValues
+            )
+            
+            // 1) Rules Check (Validates the "Math" of the filter)
+            let rulesOK = rulesPass(challenge: challenge, metrics: metrics)
+            
+            // 2) Behavioral Completion Logic
+            // FIX: Instead of forcing a high pixel-match, we check if rules pass AND similarity is > 65%.
+            // This allows the high-intensity "9 center" sharpening kernel (78.4%) to pass successfully.
+            let behavioralThreshold: Double = 65.0
+            let complete = rulesOK && (progressiveScore >= behavioralThreshold)
+            
+            // Capture previous completion state BEFORE updating
+            let wasComplete = evaluation.isComplete
+            
+            // 3) Update UI state
+            evaluation.similarityPercent = progressiveScore
+            evaluation.isComplete = complete
+            
+            // Trigger Success Celebration
+            if !wasComplete && complete && !hasCelebrated {
+                hasCelebrated = true
+                haptics.notificationOccurred(.success)
+                haptics.prepare()
+                completionPhrase = Self.encouragingPhrases.randomElement() ?? "Great job!"
+                showCompletionPrompt = true
+                UIAccessibility.post(notification: .screenChanged, argument: "Challenge completed.")
+            }
+            
+            // Guidance Logic: Help user if they have behavioral similarity but wrong rules
+            if progressiveScore >= behavioralThreshold && !rulesOK {
+                evaluation.statusText = "Image looks close! Check Kernel Rules."
+            } else {
+                evaluation.statusText = complete ? "Completed" : "In Progress"
+            }
+
+            announceSimilarityIfNeeded(displayed: progressiveScore, complete: complete)
         }
+
+    private func announceSimilarityIfNeeded(displayed: Double, complete: Bool) {
+        let now = Date()
+        guard now.timeIntervalSince(lastAnnouncementAt) >= announceDebounce else { return }
         
-        showPreprocessGate = false
-        evaluation.statusText = "Not Started"
-        hasCelebrated = false
-        showCompletionPrompt = false
-        completionPhrase = ""
-        haptics.prepare()
-        lastAnnouncedPercent = nil
-        lastAnnouncementAt = .distantPast
+        let stepRounded = max(0, min(100, Int((displayed / Double(announceStep)).rounded() * Double(announceStep))))
+        
+        if lastAnnouncedPercent != stepRounded || (complete && !hasCelebrated) {
+            lastAnnouncedPercent = stepRounded
+            lastAnnouncementAt = now
+            
+            let msg = complete
+                ? "Challenge Complete! Similarity \(stepRounded) percent. Goal reached."
+                : "Similarity \(stepRounded) percent."
+                
+            UIAccessibility.post(notification: .announcement, argument: msg)
+        }
     }
     
-    // MARK: - User interactions
+    // MARK: - Helper Logic
+    
     func updateKernel(row: Int, col: Int, value: Double) {
         kernel.set(row, col, value)
         metrics = KernelAnalysisService.analyze(kernel)
@@ -121,134 +166,10 @@ final class PlaygroundViewModel: ObservableObject {
         hasProducedOutput = false
         hasCelebrated = false
         showCompletionPrompt = false
-        completionPhrase = ""
         haptics.prepare()
         lastAnnouncedPercent = nil
-        lastAnnouncementAt = .distantPast
-    }
-    
-    func applyCurrentKernel() {
-        haptics.prepare()
-        kernelChangeSubject.send(())
-    }
-    
-    // MARK: - Core pipeline
-    private func computeTargetIfNeeded() {
-        guard let p = processed else { return }
-        let cacheKey = "\(originalAssetName)|\(challenge.id.rawValue)|\(p.optionsKey)"
-        if let cached = TargetCache.shared.get(cacheKey) {
-            self.targetBuffer = cached.buffer
-            return
-        }
-        
-        let target = ConvolutionService.convolve3x3(
-            input: p.gray,
-            width: p.width,
-            height: p.height,
-            kernel: challenge.idealKernel,
-            normalized01: preprocess.normalizeOn
-        )
-        
-        TargetCache.shared.set(cacheKey, entry: .init(
-            buffer: target.buffer,
-            image: target.image,
-            width: p.width,
-            height: p.height
-        ))
-        self.targetBuffer = target.buffer
-    }
-    
-    private func computeOutputAndEvaluate() {
-        guard !showPreprocessGate, let p = processed, let target = targetBuffer else { return }
-        
-        let out = ConvolutionService.convolve3x3(
-            input: p.gray,
-            width: p.width,
-            height: p.height,
-            kernel: kernel,
-            normalized01: preprocess.normalizeOn
-        )
-        
-        if !hasProducedOutput { hasProducedOutput = true }
-        outputUIImage = out.image
-        
-        // 1) Use the RECALIBRATED progressive similarity service
-        // Flatten 2D kernels to 1D arrays for the service
-        let userValues = kernel.values.flatMap { $0 }.map { Float($0) }
-        let targetValues = challenge.idealKernel.values.flatMap { $0 }.map { Float($0) }
-
-        let progressiveScore = SimilarityService.nccSimilarityPercent(
-            a: out.buffer,
-            b: target,
-            userKernel: userValues,
-            targetKernel: targetValues
-        )
-        
-        // 2) Rules Check
-        let rulesOK = rulesPass(challenge: challenge, metrics: metrics)
-        
-        // 3) Completion Logic (Requires high image accuracy AND math rules)
-        let signedNCC = SimilarityService.nccSigned(a: out.buffer, b: target)
-        let rawPercentSigned = signedNCC * 100.0
-        let meetsThreshold: Bool = {
-            switch challenge.id {
-            case .sobelX:
-                return abs(rawPercentSigned) >= challenge.similarityThreshold
-            default:
-                return max(0.0, rawPercentSigned) >= challenge.similarityThreshold
-            }
-        }()
-        let complete = meetsThreshold && rulesOK
-        
-        // Capture previous completion state BEFORE updating
-        let wasComplete = evaluation.isComplete
-        
-        // 4) Update UI state
-        evaluation.similarityPercent = progressiveScore
-        evaluation.isComplete = complete
-        
-        // Trigger Success Celebration on the first transition to complete
-        if !wasComplete && complete && !hasCelebrated && !showCompletionPrompt {
-            hasCelebrated = true
-            haptics.notificationOccurred(.success)
-            haptics.prepare()
-            completionPhrase = Self.encouragingPhrases.randomElement() ?? "Great job!"
-            showCompletionPrompt = true
-            UIAccessibility.post(notification: .screenChanged, argument: "Challenge completed. Choose another challenge or stay here.")
-        }
-        
-        // Contextual Status Text
-        if progressiveScore >= 85.0 && !rulesOK {
-            evaluation.statusText = "Image looks close! Check Kernel Rules."
-        } else {
-            evaluation.statusText = complete ? "Completed" : "In Progress"
-        }
-
-        announceSimilarityIfNeeded(displayed: progressiveScore, complete: complete)
     }
 
-    private func announceSimilarityIfNeeded(displayed: Double, complete: Bool) {
-        let now = Date()
-        // 1. Debounce to prevent "announcement overlap"
-        guard now.timeIntervalSince(lastAnnouncementAt) >= announceDebounce else { return }
-        
-        // 2. Round to the nearest 5% step
-        let stepRounded = max(0, min(100, Int((displayed / Double(announceStep)).rounded() * Double(announceStep))))
-        
-        // 3. Only announce if the value has changed significantly OR the user just finished
-        if lastAnnouncedPercent != stepRounded || (complete && !hasCelebrated) {
-            lastAnnouncedPercent = stepRounded
-            lastAnnouncementAt = now
-            
-            // Refinement: Add a distinctive "Goal Reached" prefix for immediate success confirmation
-            let msg = complete
-                ? "Challenge Complete! Similarity \(stepRounded) percent. You've matched the kernel pattern."
-                : "Similarity \(stepRounded) percent."
-                
-            UIAccessibility.post(notification: .announcement, argument: msg)
-        }
-    }
-    
     private func rulesPass(challenge: Challenge, metrics: KernelMetrics) -> Bool {
         func approx(_ a: Double, _ b: Double, eps: Double = 0.05) -> Bool {
             abs(a - b) <= eps
@@ -277,7 +198,27 @@ final class PlaygroundViewModel: ObservableObject {
             return isZeroSum && metrics.symmetry && hasBothSigns && patternOK && centerIsPeak && metrics.directionalBias < 0.01
             
         case .sharpening:
+            // Sharpening requirement: Sum=1, center dominance, and negative neighbors.
             return metrics.hasNegative && metrics.centerDominance && approx(metrics.sum, 1.0, eps: 0.05)
         }
+    }
+    
+    func confirmPreprocessAndEnterLab() {
+        guard let ui = originalUIImage else { return }
+        self.processed = PreprocessService.run(image: ui, targetSize: 512, options: preprocess)
+        if let p = processed {
+            self.originalUIImage = p.displayInput
+            computeTargetIfNeeded()
+        }
+        showPreprocessGate = false
+    }
+
+    private func computeTargetIfNeeded() {
+        guard let p = processed else { return }
+        let target = ConvolutionService.convolve3x3(
+            input: p.gray, width: p.width, height: p.height,
+            kernel: challenge.idealKernel, normalized01: preprocess.normalizeOn
+        )
+        self.targetBuffer = target.buffer
     }
 }

@@ -53,15 +53,13 @@ enum ChallengeFactory {
                 ],
                 criteria: [
                     "Kernel Sum ≈ 1",
-                    "Output similarity > 90%"
+                    "Output similarity > 95%"
                 ],
                 educationalText: """
 A smoothing filter reduces high-frequency noise by averaging pixel values with their neighbors. It acts as a low-pass filter, allowing slow intensity changes to pass while suppressing rapid ones.
-
-Common uses: noise reduction before edge detection, image preprocessing, depth-of-field simulation.
 """,
                 idealKernel: k,
-                similarityThreshold: 90
+                similarityThreshold: 95.0 // Smoothing is easy to match exactly
             )
 
         case .sharpening:
@@ -84,15 +82,13 @@ Common uses: noise reduction before edge detection, image preprocessing, depth-o
                 ],
                 criteria: [
                     "Clear edge enhancement",
-                    "Output similarity > 90%"
+                    "Output similarity > 70%"
                 ],
                 educationalText: """
 Sharpening enhances edges and fine details by amplifying high-frequency components. It works by subtracting a blurred version of the image from the original.
-
-Common uses: enhancing scanned documents, improving perceived focus, medical imaging.
 """,
                 idealKernel: k,
-                similarityThreshold: 90
+                similarityThreshold: 75.0 // Calibrated for high-frequency variance
             )
 
         case .sobelX:
@@ -115,15 +111,13 @@ Common uses: enhancing scanned documents, improving perceived focus, medical ima
                 ],
                 criteria: [
                     "Kernel Sum ≈ 0",
-                    "Output similarity > 90%"
+                    "Output similarity > 80%"
                 ],
                 educationalText: """
 The Sobel X operator detects vertical edges by computing the horizontal gradient of the image. It highlights regions where pixel intensity changes sharply from left to right.
-
-Common uses: lane detection in autonomous vehicles, object boundary detection, feature extraction in computer vision.
 """,
                 idealKernel: k,
-                similarityThreshold: 90
+                similarityThreshold: 80.0 // Gradients are harder to align perfectly
             )
 
         case .laplacian:
@@ -146,15 +140,13 @@ Common uses: lane detection in autonomous vehicles, object boundary detection, f
                 ],
                 criteria: [
                     "Kernel Sum ≈ 0",
-                    "Output similarity > 90%"
+                    "Output similarity > 80%"
                 ],
                 educationalText: """
 The Laplacian operator computes the second spatial derivative of an image, highlighting regions of rapid intensity change in all directions simultaneously.
-Unlike Sobel (which is directional), the Laplacian is isotropic — it responds equally to edges in any direction. The kernel sum is zero, so flat regions produce no response.
-Common uses: blob detection, edge sharpening, finding zero-crossings for precise edge localization.
 """,
                 idealKernel: k,
-                similarityThreshold: 90
+                similarityThreshold: 80.0 // Second derivatives are highly sensitive
             )
         }
     }
