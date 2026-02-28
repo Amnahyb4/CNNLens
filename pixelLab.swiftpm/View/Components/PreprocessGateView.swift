@@ -1,4 +1,3 @@
-
 import SwiftUI
 
 struct PreprocessGateView: View {
@@ -16,17 +15,19 @@ struct PreprocessGateView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .lineSpacing(2)
+                        // Grouping this text ensures it is read as a single introductory block
+                        .accessibilityLabel("Introduction: These steps standardize the image input for consistent results.")
                 }
 
                 Section("Options") {
                     Toggle("Resize", isOn: $options.resizeOn)
-                        .accessibilityHint("Standardizes image dimensions.")
+                        .accessibilityHint("Standardizes image dimensions to 512 pixels.")
 
                     Toggle("Normalize", isOn: $options.normalizeOn)
-                        .accessibilityHint("Scales pixel values to the 0 to 1 range.")
+                        .accessibilityHint("Scales pixel values to a range between 0 and 1.")
 
                     Toggle("Grayscale", isOn: $options.grayscaleOn)
-                        .accessibilityHint("Uses a single intensity channel.")
+                        .accessibilityHint("Converts the image to a single intensity channel.")
                 }
             }
             .navigationTitle("Preprocessing")
@@ -34,6 +35,7 @@ struct PreprocessGateView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
+                        .accessibilityHint("Closes the preprocessing options and returns to the previous screen.")
                 }
             }
             .safeAreaInset(edge: .bottom) {
@@ -48,11 +50,13 @@ struct PreprocessGateView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.accent)
+                    // Added a clear hint for the primary lab entry
+                    .accessibilityHint("Processes the image with your chosen options and enters the laboratory.")
 
-                    // Optional subtle note
                     Text("You can change these options later by restarting the lab.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                        .accessibilityLabel("Note: Preprocessing can be adjusted later by restarting the lab.")
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)

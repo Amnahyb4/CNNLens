@@ -11,7 +11,6 @@ struct KernelGridView: View {
         let c: Int
     }
 
-    // ✅ Keep user-typed text per cell (so "-" doesn't get overwritten)
     @State private var text: [[String]] = Array(
         repeating: Array(repeating: "0", count: 3),
         count: 3
@@ -29,11 +28,12 @@ struct KernelGridView: View {
         }
         .onAppear { syncFromKernel() }
         .onChange(of: kernel) { _ in
-            // If kernel changes programmatically (reset / presets), resync text
             syncFromKernel()
         }
+        // Refinement: Marks this as a single logical area with instructions
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Kernel grid")
+        .accessibilityLabel("Kernel Matrix")
+        .accessibilityHint("A 3 by 3 grid of numbers that define the image filter.")
     }
 
     private func cell(row: Int, col: Int) -> some View {
@@ -43,14 +43,12 @@ struct KernelGridView: View {
         return TextField("", text: Binding(
             get: { text[row][col] },
             set: { newText in
-                // ✅ Allow intermediate states like "-", ".", "-."
                 let sanitized = newText
                     .replacingOccurrences(of: ",", with: ".")
                     .filter { "0123456789.-".contains($0) }
 
                 text[row][col] = sanitized
 
-                // Only update kernel when parse is valid number
                 if let v = Double(sanitized),
                    sanitized != "-" && sanitized != "." && sanitized != "-." {
                     kernel.set(row, col, v)
@@ -60,7 +58,7 @@ struct KernelGridView: View {
         )
         .keyboardType(.numbersAndPunctuation)
         .multilineTextAlignment(.center)
-        .font(.title3.weight(.semibold))
+        .font(.title3.weight(.semibold).monospacedDigit()) // Refinement: monospaced prevents text 'jitter'
         .foregroundStyle(Theme.text)
         .frame(width: 72, height: 72)
         .background(Theme.surface2)
@@ -72,18 +70,18 @@ struct KernelGridView: View {
         )
         .focused($focusedCell, equals: id)
         .onTapGesture { focusedCell = id }
-        .onSubmit { commit(row: row, col: col) }   // if user hits return
+        .onSubmit { commit(row: row, col: col) }
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled(true)
-        .accessibilityLabel("Kernel value row \(row + 1) column \(col + 1)")
-        .accessibilityValue(text[row][col].isEmpty ? "0" : text[row][col])
+        // Accessibility Refinement: Added a descriptive hint for editing
+        .accessibilityLabel("Row \(row + 1), Column \(col + 1)")
+        .accessibilityValue(text[row][col].isEmpty ? "zero" : text[row][col])
+        .accessibilityHint("Double tap to enter a new value for this part of the filter.")
     }
 
-    // ✅ When user finishes editing, ensure kernel is updated + text normalized
     private func commit(row: Int, col: Int) {
         let raw = text[row][col].replacingOccurrences(of: ",", with: ".")
 
-        // If user leaves "-" or empty, treat as 0
         guard let v = Double(raw) else {
             text[row][col] = "0"
             kernel.set(row, col, 0)
@@ -105,6 +103,7 @@ struct KernelGridView: View {
     }
 
     private func format(_ v: Double) -> String {
+        // Simple precision check: $$|v_{rounded} - v| < \epsilon$$
         if abs(v.rounded() - v) < 0.0001 { return String(Int(v)) }
         return String(format: "%.2f", v)
     }

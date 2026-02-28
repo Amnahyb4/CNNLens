@@ -1,4 +1,3 @@
-
 import SwiftUI
 
 struct Node: Identifiable {
@@ -8,8 +7,8 @@ struct Node: Identifiable {
 }
 
 struct BackgroundNetworkView: View {
-    // You can override this when embedding if needed
-    var backgroundColor: Color = Color(red: 0.02, green: 0.05, blue: 0.12) // dark blue
+    // UI Refinement: Default to Theme background for a seamless look
+    var backgroundColor: Color = Theme.bgTop
 
     @State private var nodes: [Node] = (0..<30).map { _ in
         Node(
@@ -19,30 +18,35 @@ struct BackgroundNetworkView: View {
     }
 
     @State private var lastSize: CGSize = .zero
-
     private let timer = Timer.publish(every: 1/60, on: .main, in: .common).autoconnect()
+    
+    // Accessibility: Respect system motion settings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Canvas { context, size in
-            // Fill dark blue background
+            // Fill background with brand color
             let rectPath = Path(CGRect(origin: .zero, size: size))
             context.fill(rectPath, with: .color(backgroundColor))
 
-            // capture size (allowed)
+            // Capture size safely for node boundary logic
             if lastSize != size {
                 DispatchQueue.main.async { lastSize = size }
             }
 
-            // draw network on top
+            // Only draw if the user hasn't requested reduced motion
             if !reduceMotion {
                 draw(context: &context)
             }
         }
         .onReceive(timer) { _ in
+            // Stop logic loop if motion is reduced
             guard lastSize != .zero, !reduceMotion else { return }
             updateNodes(in: lastSize)
         }
+        // Immersive UI: Ensure background covers the entire screen
+        .ignoresSafeArea()
+        // Accessibility: Hide decorative animations from screen readers
         .accessibilityHidden(true)
     }
 
@@ -56,14 +60,15 @@ struct BackgroundNetworkView: View {
                     path.addLine(to: nodes[j].position)
 
                     let opacity = 1.0 - (dist / 150)
-                    context.stroke(path, with: .color(.blue.opacity(opacity * 0.3)), lineWidth: 0.5)
+                    // UI Refinement: Use a softer opacity of Theme.accent for the network lines
+                    context.stroke(path, with: .color(Theme.accent.opacity(opacity * 0.2)), lineWidth: 0.5)
                 }
             }
         }
 
         for node in nodes {
             let rect = CGRect(x: node.position.x - 2, y: node.position.y - 2, width: 4, height: 4)
-            context.fill(Path(ellipseIn: rect), with: .color(.blue.opacity(0.5)))
+            context.fill(Path(ellipseIn: rect), with: .color(Theme.accent.opacity(0.4)))
         }
     }
 
@@ -72,6 +77,7 @@ struct BackgroundNetworkView: View {
             nodes[i].position.x += nodes[i].velocity.x
             nodes[i].position.y += nodes[i].velocity.y
 
+            // Boundary collision logic
             if nodes[i].position.x <= 0 || nodes[i].position.x >= size.width { nodes[i].velocity.x *= -1 }
             if nodes[i].position.y <= 0 || nodes[i].position.y >= size.height { nodes[i].velocity.y *= -1 }
         }

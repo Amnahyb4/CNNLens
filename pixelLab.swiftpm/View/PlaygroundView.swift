@@ -24,6 +24,9 @@ struct PlaygroundView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    // Unified font for all text in this view
+    private let baseFont: Font = .system(size: 17, weight: .regular, design: .default)
+
     var body: some View {
         ZStack {
             background
@@ -144,6 +147,8 @@ struct PlaygroundView: View {
                 vm.confirmPreprocessAndEnterLab()
             }
         }
+        // Apply a single font to all text in this view
+        .environment(\.font, baseFont)
     }
 
     // MARK: - Success Popup UI
@@ -158,11 +163,9 @@ struct PlaygroundView: View {
             VStack(spacing: 24) {
                 VStack(spacing: 8) {
                     Text(vm.completionPhrase.isEmpty ? "Great Job!" : vm.completionPhrase)
-                        .font(.title3.weight(.bold))
                         .foregroundStyle(.white)
                     
                     Text("You've mastered \(vm.challenge.title)! Ready to explore a different concept?")
-                        .font(.body)
                         .foregroundStyle(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 20)
@@ -174,7 +177,6 @@ struct PlaygroundView: View {
                         dismiss()
                     } label: {
                         Text("Choose Another Challenge")
-                            .font(.headline)
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
@@ -186,7 +188,6 @@ struct PlaygroundView: View {
                         vm.showCompletionPrompt = false
                     } label: {
                         Text("Stay Here")
-                            .font(.subheadline.weight(.medium))
                             .foregroundStyle(.white.opacity(0.7))
                             .padding(.vertical, 8)
                     }
@@ -212,7 +213,7 @@ struct PlaygroundView: View {
     private var headerBar: some View {
         VStack(alignment: .center, spacing: 10) {
             Text("\(vm.challenge.title) Playground")
-                .font(.title2.weight(.bold))
+                .font(.system(size: 24, weight: .bold, design: .default)) // Larger title
                 .foregroundStyle(Theme.text)
                 .frame(maxWidth: .infinity, alignment: .center)
 
@@ -295,7 +296,6 @@ private struct CardHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title.uppercased())
-                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.tertiary)
                 .tracking(0.7)
                 .accessibilityAddTraits(.isHeader)

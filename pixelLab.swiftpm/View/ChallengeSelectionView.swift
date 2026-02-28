@@ -1,4 +1,3 @@
-
 import SwiftUI
 
 struct ChallengeSelectionView: View {
@@ -26,8 +25,12 @@ struct ChallengeSelectionView: View {
                 bottomCTA
             }
         }
+        // UI Fix: We set this to empty to remove the redundant top title
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        // UI Fix: These modifiers make the nav bar transparent so the gradient is full-screen
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationDestination(isPresented: $navigateToPlayground) {
             makePlaygroundDestination()
         }
@@ -63,6 +66,7 @@ struct ChallengeSelectionView: View {
                 .foregroundStyle(Theme.text)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, alignment: .center)
+                .accessibilityAddTraits(.isHeader)
 
             Text("Select a spatial filtering concept to explore.")
                 .font(.title3)
@@ -77,9 +81,11 @@ struct ChallengeSelectionView: View {
                         isSelected: vm.selected == c,
                         onTap: { vm.select(c) }
                     )
-                    .accessibilityLabel("\(c.title)")
-                    .accessibilityValue(vm.selected == c ? "Selected" : "Not selected")
-                    .accessibilityHint("Double tap to select this challenge.")
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(c.title) challenge")
+                    .accessibilityValue(vm.selected == c ? "Selected" : "")
+                    .accessibilityAddTraits(vm.selected == c ? [.isButton, .isSelected] : [.isButton])
+                    .accessibilityHint("Selects the \(c.title) concept.")
                 }
             }
             .padding(.top, 18)
@@ -100,7 +106,6 @@ struct ChallengeSelectionView: View {
 
                 onContinue?(selected)
 
-                // Navigate to Playground
                 navigateToPlayground = true
             } label: {
                 Label("Continue to Lab", systemImage: "arrow.right")
@@ -113,8 +118,8 @@ struct ChallengeSelectionView: View {
             .disabled(!vm.canContinue)
             .opacity(vm.canContinue ? 1 : 0.6)
             .padding(EdgeInsets(top: 12, leading: 48, bottom: 16, trailing: 48))
-            .accessibilityHint(vm.canContinue ? "Opens the lab for the selected challenge." : "Select a challenge to continue.")
-            .keyboardShortcut(.defaultAction) // Return/Enter triggers primary action
+            .accessibilityHint(vm.canContinue ? "Opens the lab for the selected challenge." : "Select a challenge above to enable this button.")
+            .keyboardShortcut(.defaultAction)
         }
         .background(Color.black.opacity(0.0001))
     }

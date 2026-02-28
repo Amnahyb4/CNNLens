@@ -1,19 +1,13 @@
-
 import SwiftUI
 
 struct ChallengeInfoCard: View {
-    // Header title shown on the card
     let title: String
-    // Concept/challenge name used inside the info popover/sheet
     let conceptTitle: String
-
     let goal: String
     let hints: [String]
     let criteria: [String]
     let statusText: String
     let educationalText: String
-
-    // Keep a taller box so it feels balanced on iPad; can be overridden by caller.
     var minHeight: CGFloat = 680
 
     @State private var showInfo: Bool = false
@@ -22,29 +16,29 @@ struct ChallengeInfoCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
 
-            // Header (Title Case + info button)
+            // Header: Added header trait for better rotor navigation
             HStack(spacing: 10) {
                 Text(title)
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(Theme.text)
+                    .accessibilityAddTraits(.isHeader)
 
                 Spacer()
 
                 infoButton
             }
 
-            // Divider (slightly clearer for legibility)
             Rectangle()
                 .fill(Color.white.opacity(0.08))
                 .frame(height: 1)
+                .accessibilityHidden(true)
 
-            // Goal
             Text(goal)
                 .font(.callout)
                 .foregroundStyle(Theme.secondary)
                 .lineSpacing(3)
+                .accessibilityLabel("Goal: \(goal)")
 
-            // Hints
             sectionHeader("HINTS")
 
             VStack(alignment: .leading, spacing: 10) {
@@ -53,7 +47,6 @@ struct ChallengeInfoCard: View {
                 }
             }
 
-            // Criteria
             sectionHeader("COMPLETION CRITERIA")
 
             VStack(alignment: .leading, spacing: 10) {
@@ -64,7 +57,6 @@ struct ChallengeInfoCard: View {
 
             Spacer(minLength: 8)
 
-            // Status chip
             statusChip(statusText)
         }
         .padding(18)
@@ -78,7 +70,6 @@ struct ChallengeInfoCard: View {
         .accessibilityElement(children: .contain)
     }
 
-    // MARK: - Info button with adaptive presentation
     private var infoButton: some View {
         let isPadLike = (hSize == .regular)
 
@@ -86,39 +77,36 @@ struct ChallengeInfoCard: View {
             showInfo = true
         } label: {
             Image(systemName: "info.circle")
-                .font(.system(size: 16, weight: .semibold)) // small visual size
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Theme.accent)
-                .frame(width: 44, height: 44) // HIG: minimum hit target
+                .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Learn more about this concept")
-        // iPad: Popover (contextual, lightweight, system chrome)
+        .accessibilityLabel("Learn more about \(conceptTitle)")
         .popover(isPresented: Binding(
             get: { showInfo && isPadLike },
             set: { showInfo = $0 }
         )) {
+            // This is now in-scope below
             InfoPopoverContent(
-                title: conceptTitle,               // show selected challenge name here
+                title: conceptTitle,
                 educationalText: educationalText
             )
-            .frame(width: 400) // typical popover width; feels balanced
+            .frame(width: 400)
         }
-        // iPhone: Bottom sheet (detents)
         .sheet(isPresented: Binding(
             get: { showInfo && !isPadLike },
             set: { showInfo = $0 }
         )) {
             ChallengeInfoSheetView(
-                title: conceptTitle,               // and here
+                title: conceptTitle,
                 educationalText: educationalText
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
     }
-
-    // MARK: - Subviews
 
     private func sectionHeader(_ text: String) -> some View {
         Text(text)
@@ -135,12 +123,14 @@ struct ChallengeInfoCard: View {
                 .fill(Theme.accent.opacity(0.9))
                 .frame(width: 6, height: 6)
                 .padding(.top, 6)
+                .accessibilityHidden(true)
 
             Text(text)
                 .font(.callout)
                 .foregroundStyle(Theme.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .accessibilityElement(children: .combine)
     }
 
     private func criteriaRow(text: String) -> some View {
@@ -149,26 +139,24 @@ struct ChallengeInfoCard: View {
                 .foregroundStyle(Theme.tertiary)
                 .font(.system(size: 12))
                 .padding(.top, 5)
+                .accessibilityHidden(true)
 
             Text(text)
                 .font(.callout)
                 .foregroundStyle(Theme.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .accessibilityElement(children: .combine)
     }
 
     private func statusChip(_ text: String) -> some View {
-        // Determine color based on status text
         let lower = text.lowercased()
         let isCompleted = lower.contains("completed")
-        let isNotStarted = lower.contains("not started")
         let isInProgress = lower.contains("in progress")
 
         let statusColor: Color = {
             if isCompleted { return .green }
             if isInProgress { return .yellow }
-            if isNotStarted { return Theme.secondary }
-            // fallback for any other custom statuses
             return Theme.secondary
         }()
 
@@ -176,6 +164,7 @@ struct ChallengeInfoCard: View {
             Circle()
                 .fill(statusColor)
                 .frame(width: 8, height: 8)
+                .accessibilityHidden(true)
 
             Text(text)
                 .font(.subheadline.weight(.semibold))
@@ -191,11 +180,11 @@ struct ChallengeInfoCard: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(Theme.border, lineWidth: 1)
         )
-        .accessibilityLabel("Status: \(text)")
+        .accessibilityLabel("Challenge Status: \(text)")
     }
 }
 
-// MARK: - Popover content (iPad)
+// MARK: - Missing Subviews (Fixed Scope)
 
 private struct InfoPopoverContent: View {
     let title: String
@@ -209,7 +198,7 @@ private struct InfoPopoverContent: View {
 
             Divider()
 
-            Text(title) // Selected challenge name
+            Text(title)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
 
@@ -219,6 +208,5 @@ private struct InfoPopoverContent: View {
                 .lineSpacing(3)
         }
         .padding(20)
-       
     }
 }

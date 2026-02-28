@@ -1,138 +1,106 @@
-
 import SwiftUI
-
-private enum Design {
-    enum Colors {
-        static let background = Color(red: 0.02, green: 0.05, blue: 0.12)
-        static let step = Color.blue
-        static let title = Color.white
-        static let description = Color.gray
-        static let stroke = Color.blue.opacity(0.35)
-        static let overlayGradient = [Color.clear, Color.black.opacity(0.6)]
-        static let cardShadow = Color.black.opacity(0.25)
-    }
-    enum Metrics {
-        static let gridMinColumn: CGFloat = 280
-        static let gridSpacing: CGFloat = 24
-        static let gridMaxWidth: CGFloat = 760
-        static let sectionMaxWidth: CGFloat = 640
-        static let sectionHPadding: CGFloat = 20
-        static let sectionTopPadding: CGFloat = 24
-        static let titleSpacing: CGFloat = 6
-        static let cardCornerRadius: CGFloat = 18
-        static let cardShadowRadius: CGFloat = 8
-        static let cardShadowX: CGFloat = 0
-        static let cardShadowY: CGFloat = 6
-        static let cardTextPadding: CGFloat = 12
-        static let backgroundOpacity: CGFloat = 0.25
-    }
-}
 
 struct SampleSelectionView: View {
     @StateObject private var viewModel = SampleSelectionViewModel()
     
+    // UI Fix: Use fixed columns to ensure it stays 2-across on iPad
     private var columns: [GridItem] {
-        [
-            GridItem(.flexible(minimum: Design.Metrics.gridMinColumn), spacing: Design.Metrics.gridSpacing, alignment: .top),
-            GridItem(.flexible(minimum: Design.Metrics.gridMinColumn), spacing: Design.Metrics.gridSpacing, alignment: .top)
-        ]
+        [GridItem(.flexible(), spacing: 20),
+         GridItem(.flexible(), spacing: 20)]
     }
     
     var body: some View {
         ZStack {
-            // Brand background
-            Design.Colors.background.ignoresSafeArea()
-            BackgroundNetworkView().opacity(Design.Metrics.backgroundOpacity)
+            Theme.bgTop.ignoresSafeArea()
             
-            VStack(spacing: Design.Metrics.gridSpacing) {
+            BackgroundNetworkView()
+                .opacity(0.15)
+                .accessibilityHidden(true)
+            
+            VStack(spacing: 0) {
                 header
-                    .padding(.top, Design.Metrics.sectionTopPadding)
-                
-                // 2x2 gallery grid
-                LazyVGrid(columns: columns, alignment: .center, spacing: Design.Metrics.gridSpacing) {
-                    ForEach(viewModel.samples) { sample in
-                        // Tap to select and navigate
-                        SampleCard(sample: sample)
-                            .onTapGesture {
+                    .padding(.top, 30)
+                    .padding(.bottom, 24)
+
+                ScrollView {
+                    // Grid constrained to 840 max width for better 2x2 spacing
+                    LazyVGrid(columns: columns, spacing: 20) {
+                        ForEach(viewModel.samples) { sample in
+                            Button {
                                 viewModel.selectImage(sample)
+                            } label: {
+                                SampleCard(sample: sample)
                             }
-                            .accessibilityElement(children: .combine)
+                            .buttonStyle(.plain)
                             .accessibilityLabel("Sample: \(sample.name)")
-                            .accessibilityAddTraits(.isButton)
+                        }
                     }
+                    .padding(.horizontal, 40)
+                    .padding(.bottom, 40)
+                    .frame(maxWidth: 840)
                 }
-                .frame(maxWidth: Design.Metrics.gridMaxWidth)
-                .padding(.horizontal, Design.Metrics.sectionHPadding)
-                
-                Spacer(minLength: 0)
+                .frame(maxWidth: .infinity)
             }
         }
+        // Maintains your premium immersive navigation
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationDestination(isPresented: $viewModel.navigateToChallenges) {
             ChallengeSelectionView(selectedSample: viewModel.selectedSample)
         }
-        .navigationBarTitleDisplayMode(.inline)
     }
     
     private var header: some View {
-        VStack(spacing: Design.Metrics.titleSpacing) {
-            
+        VStack(spacing: 8) {
             Text("Choose a Sample")
-                .font(.title.bold())
-                .foregroundColor(Design.Colors.title)
-                .accessibilityAddTraits(.isHeader)
+                .font(.system(.title, design: .rounded).weight(.bold))
+                .foregroundColor(Theme.text)
             
-            Text("Select an image to explore the mathematics of image convolution.")
-                .font(.body)
-                .foregroundColor(Design.Colors.description)
+            Text("Select an image to explore the mathematics of convolution.")
+                .font(.subheadline)
+                .foregroundColor(Theme.secondary)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: Design.Metrics.sectionMaxWidth)
-                .padding(.horizontal, Design.Metrics.sectionHPadding)
         }
     }
 }
 
+// MARK: - Subviews
+// This fixes the "Cannot find SampleCard in scope" error
 private struct SampleCard: View {
     let sample: SampleImage
-    private let shape = RoundedRectangle(cornerRadius: Design.Metrics.cardCornerRadius, style: .continuous)
     
     var body: some View {
-        GeometryReader { proxy in
-            let width = proxy.size.width
-            let height = width * 3.0 / 4.0
+        ZStack(alignment: .bottomLeading) {
+            // UI Fix: Forces a clean 4:3 ratio so cards are compact
+            Color.clear
+                .aspectRatio(4/3, contentMode: .fit)
+                .overlay(
+                    Image(sample.imageName)
+                        .resizable()
+                        .scaledToFill()
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .accessibilityHidden(true)
             
-            ZStack(alignment: .bottomLeading) {
-                Image(sample.imageName)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: width, height: height)
-                    .clipShape(shape)
-                    .accessibilityHidden(true)
-                
-                shape
-                    .stroke(Design.Colors.stroke, lineWidth: 1)
-                    .frame(width: width, height: height)
-                
-                LinearGradient(colors: Design.Colors.overlayGradient, startPoint: .top, endPoint: .bottom)
-                    .clipShape(shape)
-                    .frame(width: width, height: height)
-                
-                Text(sample.name)
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding(Design.Metrics.cardTextPadding)
-            }
-            .frame(width: width, height: height)
-            .shadow(color: Design.Colors.cardShadow, radius: Design.Metrics.cardShadowRadius, x: Design.Metrics.cardShadowX, y: Design.Metrics.cardShadowY)
+            // Subtle dark overlay for text legibility
+            LinearGradient(
+                colors: [.black.opacity(0.6), .clear],
+                startPoint: .bottom,
+                endPoint: .center
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            
+            Text(sample.name)
+                .font(.headline)
+                .foregroundColor(.white)
+                .padding(14)
         }
-        .aspectRatio(4.0 / 3.0, contentMode: .fit)
-        .contentShape(shape)
-    }
-}
-
-#Preview {
-    NavigationStack {
-        SampleSelectionView()
-            .preferredColorScheme(.dark)
-            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Theme.border, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
     }
 }

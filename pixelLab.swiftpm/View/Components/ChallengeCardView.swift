@@ -1,4 +1,3 @@
-
 import SwiftUI
 
 struct ChallengeRowCard: View {
@@ -9,6 +8,7 @@ struct ChallengeRowCard: View {
     var body: some View {
         Button(action: onTap) {
             HStack(alignment: .top, spacing: 16) {
+                // Main Content: Title and Description
                 VStack(alignment: .leading, spacing: 10) {
                     Text(challenge.title)
                         .font(.title3.weight(.bold))
@@ -19,16 +19,19 @@ struct ChallengeRowCard: View {
                         .foregroundStyle(Theme.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .lineLimit(3)
+                        .multilineTextAlignment(.leading)
                 }
 
                 Spacer(minLength: 12)
 
+                // Metadata Tag: Visual only, hidden from VoiceOver to reduce noise
                 PillTagView(text: challenge.tag)
-                    .accessibilityHidden(true) // decorative; row provides a single element for VO
+                    .accessibilityHidden(true)
             }
             .padding(22)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isSelected ? Theme.cardSelected : Theme.card)
+            // UI Logic: Supports 'Reduce Transparency' via Theme.surface
+            .background(isSelected ? Theme.accent.opacity(0.12) : Theme.surface)
             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 26, style: .continuous)
@@ -38,10 +41,12 @@ struct ChallengeRowCard: View {
         }
         .buttonStyle(.plain)
         .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        // Accessibility Suite
+        .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityLabel(challenge.title)
+        .accessibilityLabel("\(challenge.title) challenge")
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
-        .accessibilityHint("Double tap to select \(challenge.title).")
+        .accessibilityHint("Double tap to select the \(challenge.title) concept.")
     }
 }

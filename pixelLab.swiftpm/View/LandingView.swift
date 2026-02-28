@@ -1,42 +1,25 @@
-
 import SwiftUI
-
-private enum Design {
-    enum Colors {
-        static let background = Color(red: 0.02, green: 0.05, blue: 0.12)
-        static let titleGradient = [Color.blue.opacity(0.7), Color.purple.opacity(0.8)]
-        static let description = Color.gray
-        static let ctaTint = Color.blue
-    }
-    enum Metrics {
-        static let titleSize: CGFloat = 69
-        static let descriptionMaxWidth: CGFloat = 620
-        static let buttonMaxWidth: CGFloat = 360
-        static let buttonMinHeight: CGFloat = 44
-        static let horizontalPadding: CGFloat = 24
-        static let vStackSpacing: CGFloat = 28
-        static let topPadding: CGFloat = 8
-        static let cornerRadius: CGFloat = 12
-        static let backgroundOpacity: CGFloat = 0.4
-    }
-}
 
 struct LandingView: View {
     @StateObject private var viewModel = LandingViewModel()
     
+    // Use ScaledMetric so the 69pt title respects the user's text size settings
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 69
+    
     var body: some View {
         ZStack {
-            // Brand background
-            Design.Colors.background
+            // Use your consistent brand background
+            LinearGradient(colors: [Theme.bgTop, Theme.bgBottom], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
             
             BackgroundNetworkView()
-                .opacity(Design.Metrics.backgroundOpacity)
+                .opacity(0.4)
                 .allowsHitTesting(false)
+                .accessibilityHidden(true) // Explicitly hide decorative background from VoiceOver
             
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                .padding(.horizontal, Design.Metrics.horizontalPadding)
+                .padding(.horizontal, 24)
         }
         .navigationDestination(isPresented: $viewModel.navigateToSamples) {
             SampleSelectionView()
@@ -44,53 +27,41 @@ struct LandingView: View {
     }
     
     private var content: some View {
-        VStack(spacing: Design.Metrics.vStackSpacing) {
+        VStack(spacing: 28) {
             // Main Title
             Text(viewModel.config.title)
-                .font(.system(size: Design.Metrics.titleSize, weight: .bold))
-                .minimumScaleFactor(0.85)
+                .font(.system(size: titleSize, weight: .bold)) // Now scales dynamically
+                .minimumScaleFactor(0.7) // More generous scaling for accessibility
                 .multilineTextAlignment(.center)
                 .foregroundStyle(
                     LinearGradient(
-                        colors: Design.Colors.titleGradient,
+                        colors: [Color.blue.opacity(0.8), Color.purple.opacity(0.9)],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
-                .accessibilityAddTraits(.isHeader)
+                .accessibilityAddTraits(.isHeader) // Correctly implemented
             
             // Description
             Text(viewModel.config.description)
                 .font(.title3)
-                .foregroundColor(Design.Colors.description)
+                .foregroundColor(Theme.secondary) // Improved contrast vs Color.gray
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: Design.Metrics.descriptionMaxWidth)
-                .padding(.horizontal, Design.Metrics.horizontalPadding)
+                .frame(maxWidth: 620)
+                .padding(.horizontal, 24)
             
             // Primary Action Button
             Button(action: viewModel.startExperience) {
                 Text(viewModel.config.buttonText)
                     .font(.headline)
-                    .frame(maxWidth: Design.Metrics.buttonMaxWidth,
-                           minHeight: Design.Metrics.buttonMinHeight)
+                    .frame(maxWidth: 360, minHeight: 50) // Increased to 50 for even better accessibility
             }
             .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-            .tint(Design.Colors.ctaTint)
-            .clipShape(RoundedRectangle(cornerRadius: Design.Metrics.cornerRadius, style: .continuous))
-            .padding(.top, Design.Metrics.topPadding)
+            .tint(Theme.accent)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(.top, 8)
             .accessibilityLabel(viewModel.config.buttonText)
-        }
-    }
-}
-
-// Preview for iPad/iPhone
-struct LandingView_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationStack {
-            LandingView()
-                .preferredColorScheme(.dark)
-                .dynamicTypeSize(...DynamicTypeSize.accessibility5)
+            .accessibilityHint("Starts the PixelLab experience.") // Added context for VoiceOver users
         }
     }
 }

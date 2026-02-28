@@ -1,4 +1,3 @@
-
 import SwiftUI
 
 struct PillTagView: View {
@@ -6,12 +5,19 @@ struct PillTagView: View {
 
     var body: some View {
         Text(text)
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(Color.white.opacity(0.78))
+            // Weight increased to .semibold to maintain legibility when scaled up
+            .font(.subheadline.weight(.semibold))
+            // Using Theme.text (97% white) for better contrast
+            .foregroundStyle(Theme.text)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(Color.white.opacity(0.08))
+            // Use Theme.surface2 to support the Reduce Transparency fallback
+            .background(Theme.surface2)
             .clipShape(Capsule())
-            .accessibilityLabel("Tag: \(text)")
+            .overlay(
+                Capsule()
+                    .stroke(Theme.border, lineWidth: 1) // Adds definition on dark backgrounds
+            )
+            .accessibilityLabel("Category: \(text)")
     }
 }

@@ -227,12 +227,22 @@ final class PlaygroundViewModel: ObservableObject {
 
     private func announceSimilarityIfNeeded(displayed: Double, complete: Bool) {
         let now = Date()
+        // 1. Debounce to prevent "announcement overlap"
         guard now.timeIntervalSince(lastAnnouncementAt) >= announceDebounce else { return }
+        
+        // 2. Round to the nearest 5% step
         let stepRounded = max(0, min(100, Int((displayed / Double(announceStep)).rounded() * Double(announceStep))))
-        if lastAnnouncedPercent != stepRounded {
+        
+        // 3. Only announce if the value has changed significantly OR the user just finished
+        if lastAnnouncedPercent != stepRounded || (complete && !hasCelebrated) {
             lastAnnouncedPercent = stepRounded
             lastAnnouncementAt = now
-            let msg = complete ? "Similarity \(stepRounded) percent. Goal reached." : "Similarity \(stepRounded) percent."
+            
+            // Refinement: Add a distinctive "Goal Reached" prefix for immediate success confirmation
+            let msg = complete
+                ? "Challenge Complete! Similarity \(stepRounded) percent. You've matched the kernel pattern."
+                : "Similarity \(stepRounded) percent."
+                
             UIAccessibility.post(notification: .announcement, argument: msg)
         }
     }
